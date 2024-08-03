@@ -47,7 +47,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR3</h1>
+        <h1>PDF Összehasonlító</h1>
         <div class="controls">
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
@@ -72,11 +72,15 @@
         let blinkInterval;
         let originalScale = 1;
         let offsetX = 0, offsetY = 0, scale = 1;
+        let file1Path = '';
+        let file2Path = '';
 
         async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
             const file2 = document.getElementById('file2').files[0];
             if (file1 && file2) {
+                file1Path = file1.name;
+                file2Path = file2.name;
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
                 fitCanvasesToContainer();
@@ -173,6 +177,12 @@
                     unit: 'px',
                     format: [canvas.width, canvas.height]
                 });
+
+                const context = canvas.getContext('2d');
+                context.font = '20px Arial';
+                context.fillStyle = 'black';
+                context.fillText(`File 1: ${file1Path}`, 10, canvas.height - 60);
+                context.fillText(`File 2: ${file2Path}`, 10, canvas.height - 30);
 
                 const imgData = canvas.toDataURL('image/png');
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
