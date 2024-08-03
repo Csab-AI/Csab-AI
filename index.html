@@ -42,7 +42,7 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló MenüR2</h2>
+            <h2>Rajzoló Menü</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
@@ -257,8 +257,8 @@
                 
                 // Adding the file names to the PDF
                 pdf.setFontSize(10);
-                pdf.text(File 1: ${file1Name}, 10, pdf.internal.pageSize.height - 20);
-                pdf.text(File 2: ${file2Name}, 10, pdf.internal.pageSize.height - 10);
+                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
+                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
 
                 pdf.save('current_view.pdf');
             });
@@ -317,7 +317,7 @@
         function updateTransform() {
             const canvases = document.getElementsByTagName('canvas');
             for (let canvas of canvases) {
-                canvas.style.transform = translate(${offsetX}px, ${offsetY}px) scale(${scale});
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
             }
         }
     </script>
