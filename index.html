@@ -47,6 +47,8 @@
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
             <input type="text" id="textInput" placeholder="Felirat szövege">
+            <input type="file" id="file1" accept="application/pdf">
+            <input type="file" id="file2" accept="application/pdf">
             <button onclick="comparePDFs()">Összehasonlítás</button>
             <label>Átlátszóság:</label>
             <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
@@ -72,6 +74,12 @@
         let drawing = false;
         let drawType = '';
         let startX, startY;
+        let drawingCanvas, drawingContext;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            drawingCanvas = document.getElementById('drawingCanvas');
+            drawingContext = drawingCanvas.getContext('2d');
+        });
 
         async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
@@ -116,6 +124,10 @@
                 };
                 await page.render(renderContext).promise;
                 console.log('Oldal renderelve');
+
+                // Update drawing canvas size
+                drawingCanvas.width = canvas.width;
+                drawingCanvas.height = canvas.height;
             };
             reader.readAsArrayBuffer(file);
         }
@@ -170,45 +182,39 @@
         }
 
         function draw(e) {
-            const canvas = document.getElementById('drawingCanvas');
-            const context = canvas.getContext('2d');
-
             if (!drawing) return;
 
-            if (drawType === 'line' || drawType === 'circle') {
-                context.clearRect(0, 0, canvas.width, canvas.height);
-            }
-
-            const rect = canvas.getBoundingClientRect();
+            const rect = drawingCanvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / scale;
             const y = (e.clientY - rect.top) / scale;
 
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
             if (drawType === 'line') {
-                context.beginPath();
-                context.moveTo(startX, startY);
-                context.lineTo(x, y);
-                context.stroke();
+                drawingContext.beginPath();
+                drawingContext.moveTo(startX, startY);
+                drawingContext.lineTo(x, y);
+                drawingContext.stroke();
             } else if (drawType === 'circle') {
                 const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                context.beginPath();
-                context.arc(startX, startY, radius, 0, Math.PI * 2);
-                context.stroke();
+                drawingContext.beginPath();
+                drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
+                drawingContext.stroke();
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
-                context.fillText(text, x, y);
+                drawingContext.fillText(text, x, y);
                 stopDrawing();
             }
         }
 
         function saveDrawing() {
-            const drawingCanvas = document.getElementById('drawingCanvas');
             const mainCanvas1 = document.getElementById('canvas1');
             const mainCanvas2 = document.getElementById('canvas2');
             const context1 = mainCanvas1.getContext('2d');
             const context2 = mainCanvas2.getContext('2d');
             context1.drawImage(drawingCanvas, 0, 0);
             context2.drawImage(drawingCanvas, 0, 0);
-            drawingCanvas.getContext('2d').clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
         }
 
         async function saveAsPDF() {
