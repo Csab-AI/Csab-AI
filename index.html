@@ -42,13 +42,12 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
+            <h2>Rajzoló MenüR3</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
             <input type="color" id="colorPicker" value="#000000">
             <input type="text" id="textInput" placeholder="Felirat szövege">
-            <button onclick="undoLast()">Utolsó Lépés Visszavonása</button>
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
             <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -78,7 +77,8 @@
         let startX, startY;
         let drawingCanvas, drawingContext;
         let color = '#000000';
-        let actions = [];
+        let file1Name = '';
+        let file2Name = '';
 
         document.addEventListener("DOMContentLoaded", () => {
             drawingCanvas = document.getElementById('drawingCanvas');
@@ -92,6 +92,8 @@
             const file1 = document.getElementById('file1').files[0];
             const file2 = document.getElementById('file2').files[0];
             if (file1 && file2) {
+                file1Name = file1.name;
+                file2Name = file2.name;
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
                 fitCanvasesToContainer();
@@ -215,6 +217,8 @@
                 drawingContext.stroke();
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
+                drawingContext.textAlign = "center";
+                drawingContext.textBaseline = "middle";
                 drawingContext.fillText(text, x, y);
                 saveDrawing();
                 stopDrawing();
@@ -223,12 +227,6 @@
         }
 
         function saveDrawing() {
-            const drawingImage = drawingCanvas.toDataURL();
-            actions.push(drawingImage);
-            if (actions.length > 5) {
-                actions.shift();
-            }
-
             const mainCanvas1 = document.getElementById('canvas1');
             const mainCanvas2 = document.getElementById('canvas2');
             const context1 = mainCanvas1.getContext('2d');
@@ -238,28 +236,6 @@
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
             stopDrawing();
-        }
-
-        function undoLast() {
-            if (actions.length === 0) return;
-            actions.pop();
-            redrawMainCanvases();
-        }
-
-        function redrawMainCanvases() {
-            const mainCanvas1 = document.getElementById('canvas1');
-            const mainCanvas2 = document.getElementById('canvas2');
-            const context1 = mainCanvas1.getContext('2d');
-            const context2 = mainCanvas2.getContext('2d');
-            context1.clearRect(0, 0, mainCanvas1.width, mainCanvas1.height);
-            context2.clearRect(0, 0, mainCanvas2.width, mainCanvas2.height);
-
-            const img = new Image();
-            img.src = actions[actions.length - 1] || '';
-            img.onload = () => {
-                context1.drawImage(img, 0, 0);
-                context2.drawImage(img, 0, 0);
-            };
         }
 
         async function saveAsPDF() {
@@ -278,6 +254,12 @@
 
                 const imgData = canvas.toDataURL('image/png');
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                
+                // Adding the file names to the PDF
+                pdf.setFontSize(10);
+                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
+                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
+
                 pdf.save('current_view.pdf');
             });
         }
