@@ -42,10 +42,12 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>PDF összehasonlító</h2>
+            <h2>Rajzoló Menü</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
+            <button onclick="startDrawing('rect')">Téglalap Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
+            <button onclick="selectElement()">Elem Kijelölése</button>
             <input type="color" id="colorPicker" value="#000000">
             <input type="text" id="textInput" placeholder="Felirat szövege">
             <input type="file" id="file1" accept="application/pdf">
@@ -79,6 +81,10 @@
         let color = '#000000';
         let file1Name = '';
         let file2Name = '';
+        let elements = [];
+        let selectedElement = null;
+        let isDragging = false;
+        let startDragX, startDragY;
 
         document.addEventListener("DOMContentLoaded", () => {
             drawingCanvas = document.getElementById('drawingCanvas');
@@ -109,10 +115,8 @@
                 const pdfData = new Uint8Array(reader.result);
                 const loadingTask = pdfjsLib.getDocument({data: pdfData});
                 const pdf = await loadingTask.promise;
-                console.log('PDF betöltve:', pdf);
                 const pageNumber = 1;
                 const page = await pdf.getPage(pageNumber);
-                console.log('Oldal:', page);
                 const viewport = page.getViewport({scale: 1});
 
                 const canvas = document.getElementById(canvasId);
@@ -132,9 +136,7 @@
                     viewport: scaledViewport
                 };
                 await page.render(renderContext).promise;
-                console.log('Oldal renderelve');
 
-                // Update drawing canvas size
                 drawingCanvas.width = canvas.width;
                 drawingCanvas.height = canvas.height;
             };
@@ -201,6 +203,7 @@
             const y = (e.clientY - rect.top) / scale;
 
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            redrawElements();
 
             drawingContext.strokeStyle = color;
             drawingContext.fillStyle = color;
@@ -210,42 +213,153 @@
                 drawingContext.moveTo(startX, startY);
                 drawingContext.lineTo(x, y);
                 drawingContext.stroke();
-                saveDrawing();
+                saveElement({ type: 'line', startX, startY, x, y, color });
                 stopDrawing();
             } else if (drawType === 'circle') {
                 const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
                 drawingContext.beginPath();
                 drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
                 drawingContext.stroke();
-                saveDrawing();
+                saveElement({ type: 'circle', startX, startY, radius, color });
+                stopDrawing();
+            } else if (drawType === 'rect') {
+                const width = x - startX;
+                const height = y - startY;
+                drawingContext.strokeRect(startX, startY, width, height);
+                saveElement({ type: 'rect', startX, startY, width, height, color });
                 stopDrawing();
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
                 drawingContext.textAlign = "center";
                 drawingContext.textBaseline = "middle";
                 drawingContext.fillText(text, x, y);
-                saveDrawing();
+                saveElement({ type: 'text', x, y, text, color });
                 stopDrawing();
                 return;
             }
         }
 
-        function saveDrawing() {
-            const mainCanvas1 = document.getElementById('canvas1');
-            const mainCanvas2 = document.getElementById('canvas2');
-            const context1 = mainCanvas1.getContext('2d');
-            const context2 = mainCanvas2.getContext('2d');
-            context1.drawImage(drawingCanvas, 0, 0);
-            context2.drawImage(drawingCanvas, 0, 0);
-            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-            stopDrawing();
+        function saveElement(element) {
+            elements.push(element);
+            redrawElements();
         }
+
+        function redrawElements() {
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            elements.forEach(element => {
+                drawingContext.strokeStyle = element.color;
+                drawingContext.fillStyle = element.color;
+                if (element.type === 'line') {
+                    drawingContext.beginPath();
+                    drawingContext.moveTo(element.startX, element.startY);
+                    drawingContext.lineTo(element.x, element.y);
+                    drawingContext.stroke();
+                } else if (element.type === 'circle') {
+                    drawingContext.beginPath();
+                    drawingContext.arc(element.startX, element.startY, element.radius, 0, Math.PI * 2);
+                    drawingContext.stroke();
+                } else if (element.type === 'rect') {
+                    drawingContext.strokeRect(element.startX, element.startY, element.width, element.height);
+                } else if (element.type === 'text') {
+                    drawingContext.textAlign = "center";
+                    drawingContext.textBaseline = "middle";
+                    drawingContext.fillText(element.text, element.x, element.y);
+                }
+            });
+        }
+
+        function selectElement() {
+            drawType = 'select';
+            document.getElementById('canvasContainer').style.cursor = 'pointer';
+        }
+
+        function findElement(x, y) {
+            for (let i = elements.length - 1; i >= 0; i--) {
+                const element = elements[i];
+                if (element.type === 'line') {
+                    const dx = element.x - element.startX;
+                    const dy = element.y - element.startY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const distanceToStart = Math.sqrt((x - element.startX) ** 2 + (y - element.startY) ** 2);
+                    const distanceToEnd = Math.sqrt((x - element.x) ** 2 + (y - element.y) ** 2);
+                    if (distanceToStart + distanceToEnd <= distance + 5) {
+                        return element;
+                    }
+                } else if (element.type === 'circle') {
+                    const distance = Math.sqrt((x - element.startX) ** 2 + (y - element.startY) ** 2);
+                    if (distance <= element.radius) {
+                        return element;
+                    }
+                } else if (element.type === 'rect') {
+                    if (x >= element.startX && x <= element.startX + element.width && y >= element.startY && y <= element.startY + element.height) {
+                        return element;
+                    }
+                } else if (element.type === 'text') {
+                    const textWidth = drawingContext.measureText(element.text).width;
+                    if (x >= element.x - textWidth / 2 && x <= element.x + textWidth / 2 && y >= element.y - 10 && y <= element.y + 10) {
+                        return element;
+                    }
+                }
+            }
+            return null;
+        }
+
+        drawingCanvas.addEventListener('mousedown', (e) => {
+            const rect = drawingCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+
+            if (drawType === 'select') {
+                selectedElement = findElement(x, y);
+                if (selectedElement) {
+                    isDragging = true;
+                    startDragX = x;
+                    startDragY = y;
+                }
+            } else {
+                startX = x;
+                startY = y;
+                draw(e);
+            }
+        });
+
+        drawingCanvas.addEventListener('mousemove', (e) => {
+            if (isDragging && selectedElement) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / scale;
+                const y = (e.clientY - rect.top) / scale;
+
+                const dx = x - startDragX;
+                const dy = y - startDragY;
+
+                if (selectedElement.type === 'line') {
+                    selectedElement.startX += dx;
+                    selectedElement.startY += dy;
+                    selectedElement.x += dx;
+                    selectedElement.y += dy;
+                } else if (selectedElement.type === 'circle' || selectedElement.type === 'rect') {
+                    selectedElement.startX += dx;
+                    selectedElement.startY += dy;
+                } else if (selectedElement.type === 'text') {
+                    selectedElement.x += dx;
+                    selectedElement.y += dy;
+                }
+
+                startDragX = x;
+                startDragY = y;
+
+                redrawElements();
+            }
+        });
+
+        drawingCanvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
 
         async function saveAsPDF() {
             const { jsPDF } = window.jspdf;
             const container = document.getElementById('canvasContainer');
-            
+
             html2canvas(container, {
                 scale: 2,
                 useCORS: true
@@ -258,7 +372,7 @@
 
                 const imgData = canvas.toDataURL('image/png');
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                
+
                 // Adding the file names to the PDF
                 pdf.setFontSize(10);
                 pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
@@ -271,24 +385,9 @@
         window.addEventListener('resize', fitCanvasesToContainer);
 
         // Zoom and Pan functionality
-        let isDragging = false;
-        let canvasDragging = false;
-        let canvasStartX, canvasStartY;
-
         const container = document.getElementById('canvasContainer');
         container.addEventListener('mousedown', (e) => {
-            if (drawing) {
-                const rect = e.target.getBoundingClientRect();
-                startX = (e.clientX - rect.left) / scale;
-                startY = (e.clientY - rect.top) / scale;
-                document.addEventListener('mousemove', draw);
-                document.addEventListener('mouseup', () => {
-                    document.removeEventListener('mousemove', draw);
-                    if (drawType !== 'text') {
-                        saveDrawing();
-                    }
-                }, { once: true });
-            } else {
+            if (!drawing && !isDragging) {
                 canvasDragging = true;
                 canvasStartX = e.clientX - offsetX;
                 canvasStartY = e.clientY - offsetY;
@@ -327,4 +426,3 @@
     </script>
 </body>
 </html>
-
