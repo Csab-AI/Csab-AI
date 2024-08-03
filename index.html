@@ -42,10 +42,9 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
+            <h2>Rajzoló MenüR1</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
-            <button onclick="startDrawing('rect')">Téglalap Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
             <input type="color" id="colorPicker" value="#000000">
             <input type="text" id="textInput" placeholder="Felirat szövege">
@@ -80,8 +79,6 @@
         let color = '#000000';
         let file1Name = '';
         let file2Name = '';
-        let selectedElement = null;
-        let elements = [];
 
         document.addEventListener("DOMContentLoaded", () => {
             drawingCanvas = document.getElementById('drawingCanvas');
@@ -89,9 +86,6 @@
             document.getElementById('colorPicker').addEventListener('input', (e) => {
                 color = e.target.value;
             });
-            drawingCanvas.addEventListener('mousedown', onCanvasMouseDown);
-            drawingCanvas.addEventListener('mousemove', onCanvasMouseMove);
-            drawingCanvas.addEventListener('mouseup', onCanvasMouseUp);
         });
 
         async function comparePDFs() {
@@ -225,10 +219,6 @@
                 drawingContext.stroke();
                 saveDrawing();
                 stopDrawing();
-            } else if (drawType === 'rect') {
-                drawingContext.strokeRect(startX, startY, x - startX, y - startY);
-                saveDrawing();
-                stopDrawing();
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
                 drawingContext.textAlign = "center";
@@ -250,180 +240,6 @@
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
             stopDrawing();
-        }
-
-        function onCanvasMouseDown(e) {
-            const rect = drawingCanvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / scale;
-            const y = (e.clientY - rect.top) / scale;
-
-            if (drawType) {
-                startX = x;
-                startY = y;
-                drawing = true;
-            } else {
-                selectedElement = elements.find(el => isInsideElement(x, y, el));
-                if (selectedElement) {
-                    drawingCanvas.style.cursor = 'move';
-                }
-            }
-        }
-
-        function onCanvasMouseMove(e) {
-            if (!drawing && !selectedElement) return;
-
-            const rect = drawingCanvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / scale;
-            const y = (e.clientY - rect.top) / scale;
-
-            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-            elements.forEach(el => drawElement(el));
-
-            drawingContext.strokeStyle = color;
-            drawingContext.fillStyle = color;
-
-            if (drawing) {
-                if (drawType === 'line') {
-                    drawLine(startX, startY, x, y);
-                } else if (drawType === 'circle') {
-                    const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                    drawCircle(startX, startY, radius);
-                } else if (drawType === 'rect') {
-                    drawRect(startX, startY, x - startX, y - startY);
-                }
-            } else if (selectedElement) {
-                const dx = x - selectedElement.x;
-                const dy = y - selectedElement.y;
-                selectedElement.x = x;
-                selectedElement.y = y;
-                if (selectedElement.type === 'line') {
-                    selectedElement.endX += dx;
-                    selectedElement.endY += dy;
-                } else if (selectedElement.type === 'circle') {
-                    selectedElement.radius = Math.sqrt(Math.pow(selectedElement.endX - selectedElement.x, 2) + Math.pow(selectedElement.endY - selectedElement.y, 2));
-                } else if (selectedElement.type === 'rect') {
-                    selectedElement.width = selectedElement.endX - selectedElement.x;
-                    selectedElement.height = selectedElement.endY - selectedElement.y;
-                } else if (selectedElement.type === 'text') {
-                    selectedElement.text = document.getElementById('textInput').value;
-                }
-            }
-        }
-
-        function onCanvasMouseUp(e) {
-            if (drawing) {
-                const rect = drawingCanvas.getBoundingClientRect();
-                const x = (e.clientX - rect.left) / scale;
-                const y = (e.clientY - rect.top) / scale;
-
-                if (drawType === 'line') {
-                    elements.push({ type: 'line', x: startX, y: startY, endX: x, endY: y, color });
-                } else if (drawType === 'circle') {
-                    const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                    elements.push({ type: 'circle', x: startX, y: startY, radius, color });
-                } else if (drawType === 'rect') {
-                    elements.push({ type: 'rect', x: startX, y: startY, endX: x, endY: y, width: x - startX, height: y - startY, color });
-                } else if (drawType === 'text') {
-                    const text = document.getElementById('textInput').value;
-                    elements.push({ type: 'text', x, y, text, color });
-                }
-
-                drawing = false;
-                drawType = '';
-                drawingCanvas.style.cursor = 'default';
-                redraw();
-            } else if (selectedElement) {
-                selectedElement = null;
-                drawingCanvas.style.cursor = 'default';
-                redraw();
-            }
-        }
-
-        function isInsideElement(x, y, element) {
-            if (element.type === 'line') {
-                return isPointNearLine(x, y, element.x, element.y, element.endX, element.endY);
-            } else if (element.type === 'circle') {
-                const distance = Math.sqrt(Math.pow(x - element.x, 2) + Math.pow(y - element.y, 2));
-                return distance <= element.radius;
-            } else if (element.type === 'rect') {
-                return x >= element.x && x <= element.x + element.width && y >= element.y && y <= element.y + element.height;
-            } else if (element.type === 'text') {
-                // Approximate text bounding box
-                return x >= element.x && x <= element.x + element.text.length * 7 && y >= element.y - 10 && y <= element.y + 10;
-            }
-            return false;
-        }
-
-        function isPointNearLine(px, py, x1, y1, x2, y2) {
-            const A = px - x1;
-            const B = py - y1;
-            const C = x2 - x1;
-            const D = y2 - y1;
-
-            const dot = A * C + B * D;
-            const lenSq = C * C + D * D;
-            const param = dot / lenSq;
-
-            let xx, yy;
-
-            if (param < 0 || (x1 === x2 && y1 === y2)) {
-                xx = x1;
-                yy = y1;
-            } else if (param > 1) {
-                xx = x2;
-                yy = y2;
-            } else {
-                xx = x1 + param * C;
-                yy = y1 + param * D;
-            }
-
-            const dx = px - xx;
-            const dy = py - yy;
-            return Math.sqrt(dx * dx + dy * dy) < 5; // Consider points within 5 pixels near the line
-        }
-
-        function drawElement(element) {
-            drawingContext.strokeStyle = element.color;
-            drawingContext.fillStyle = element.color;
-
-            if (element.type === 'line') {
-                drawLine(element.x, element.y, element.endX, element.endY);
-            } else if (element.type === 'circle') {
-                drawCircle(element.x, element.y, element.radius);
-            } else if (element.type === 'rect') {
-                drawRect(element.x, element.y, element.width, element.height);
-            } else if (element.type === 'text') {
-                drawText(element.x, element.y, element.text);
-            }
-        }
-
-        function drawLine(x1, y1, x2, y2) {
-            drawingContext.beginPath();
-            drawingContext.moveTo(x1, y1);
-            drawingContext.lineTo(x2, y2);
-            drawingContext.stroke();
-        }
-
-        function drawCircle(x, y, radius) {
-            drawingContext.beginPath();
-            drawingContext.arc(x, y, radius, 0, Math.PI * 2);
-            drawingContext.stroke();
-        }
-
-        function drawRect(x, y, width, height) {
-            drawingContext.strokeRect(x, y, width, height);
-        }
-
-        function drawText(x, y, text) {
-            drawingContext.textAlign = "center";
-            drawingContext.textBaseline = "middle";
-            drawingContext.fillText(text, x, y);
-        }
-
-        function redraw() {
-            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-            elements.forEach(el => drawElement(el));
         }
 
         async function saveAsPDF() {
@@ -494,7 +310,7 @@
         });
 
         container.addEventListener('wheel', (e) => {
-            e.preventDefault();
+            e.prevent.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             scale *= delta;
             offsetX = (e.clientX - container.clientWidth / 2) * (1 - delta) + offsetX;
