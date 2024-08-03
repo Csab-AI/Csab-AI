@@ -23,12 +23,14 @@
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR2</h1>
+        <h1>PDF ÖsszehasonlítóR3h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -74,8 +76,8 @@
 
                 const canvas = document.getElementById(canvasId);
                 const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+                const outputScale = canvas.width / viewport.width;
+                canvas.height = viewport.height * outputScale;
 
                 const renderContext = {
                     canvasContext: context,
@@ -83,6 +85,17 @@
                 };
                 await page.render(renderContext).promise;
                 console.log('Oldal renderelve');
+
+                // Scale the canvas to fit its container
+                const container = document.getElementById('canvasContainer');
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+                const scaleX = containerWidth / canvas.width;
+                const scaleY = containerHeight / canvas.height;
+                const scale = Math.min(scaleX, scaleY);
+
+                canvas.style.transform = `scale(${scale})`;
+                canvas.style.transformOrigin = 'top left';
             };
             reader.readAsArrayBuffer(file);
         }
@@ -114,3 +127,4 @@
     </script>
 </body>
 </html>
+
