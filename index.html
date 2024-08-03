@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Összehasonlító</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        #pdf1, #pdf2 {
+            width: 45%;
+            height: 500px;
+            border: 1px solid #000;
+            margin: 10px;
+            display: inline-block;
+        }
+        #output {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PDF Összehasonlító</h1>
+        <input type="file" id="file1" accept="application/pdf">
+        <input type="file" id="file2" accept="application/pdf">
+        <button onclick="comparePDFs()">Összehasonlítás</button>
+        <div id="output">
+            <div id="pdf1"></div>
+            <div id="pdf2"></div>
+        </div>
+    </div>
+    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+    <script>
+        function comparePDFs() {
+            const file1 = document.getElementById('file1').files[0];
+            const file2 = document.getElementById('file2').files[0];
+            if (file1 && file2) {
+                displayPDF(file1, 'pdf1');
+                displayPDF(file2, 'pdf2');
+            } else {
+                alert('Kérjük, válassza ki mindkét PDF fájlt.');
+            }
+        }
+
+        function displayPDF(file, containerId) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const pdfData = new Uint8Array(reader.result);
+                const loadingTask = pdfjsLib.getDocument({data: pdfData});
+                loadingTask.promise.then(function(pdf) {
+                    console.log('PDF betöltve:', pdf);
+                    const pageNumber = 1;
+                    pdf.getPage(pageNumber).then(function(page) {
+                        console.log('Oldal:', page);
+                        const scale = 1.5;
+                        const viewport = page.getViewport({scale: scale});
+
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        const renderContext = {
+                            canvasContext: context,
+                            viewport: viewport
+                        };
+                        page.render(renderContext).promise.then(function() {
+                            console.log('Oldal renderelve');
+                            document.getElementById(containerId).appendChild(canvas);
+                        });
+                    });
+                }, function(reason) {
+                    console.error('Hiba a PDF betöltésekor:', reason);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
