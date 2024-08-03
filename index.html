@@ -47,7 +47,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR1</h1>
+        <h1>PDF Összehasonlító</h1>
         <div class="controls">
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
@@ -56,6 +56,8 @@
             <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
             <button onclick="startBlinking()">Villogtatás</button>
             <button onclick="stopBlinking()">Villogtatás Leállítása</button>
+            <button onclick="resetView()">Eredeti nézet visszaállítása</button>
+            <button onclick="saveAsPDF()">Mentés PDF-be</button>
         </div>
         <div id="canvasContainer">
             <canvas id="canvas1"></canvas>
@@ -63,9 +65,12 @@
         </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
     <script>
         let blinking = false;
         let blinkInterval;
+        let originalScale = 1;
+        let offsetX = 0, offsetY = 0, scale = 1;
 
         async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
@@ -74,6 +79,7 @@
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
                 fitCanvasesToContainer();
+                resetView();
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
             }
@@ -98,6 +104,7 @@
                 const scaleY = container.clientHeight / viewport.height;
                 const scale = Math.min(scaleX, scaleY);
                 const scaledViewport = page.getViewport({scale: scale});
+                originalScale = scale;
 
                 canvas.width = scaledViewport.width;
                 canvas.height = scaledViewport.height;
@@ -145,13 +152,35 @@
             blinkInterval = setTimeout(blink, 500);
         }
 
+        function resetView() {
+            scale = originalScale;
+            offsetX = 0;
+            offsetY = 0;
+            updateTransform();
+        }
+
+        async function saveAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const canvases = document.getElementsByTagName('canvas');
+            const pdf = new jsPDF();
+
+            for (let i = 0; i < canvases.length; i++) {
+                const canvas = canvases[i];
+                if (i > 0) {
+                    pdf.addPage();
+                }
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.width, pdf.internal.pageSize.height);
+            }
+
+            pdf.save('merged.pdf');
+        }
+
         window.addEventListener('resize', fitCanvasesToContainer);
 
         // Zoom and Pan functionality
         let isDragging = false;
         let startX, startY;
-        let offsetX = 0, offsetY = 0;
-        let scale = 1;
 
         const container = document.getElementById('canvasContainer');
         container.addEventListener('mousedown', (e) => {
@@ -190,4 +219,5 @@
     </script>
 </body>
 </html>
+
 
