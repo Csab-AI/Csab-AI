@@ -47,7 +47,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF Összehasonlító</h1>
+        <h1>PDF ÖsszehasonlítóR2</h1>
         <div class="controls">
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
@@ -161,19 +161,27 @@
 
         async function saveAsPDF() {
             const { jsPDF } = window.jspdf;
-            const canvases = document.getElementsByTagName('canvas');
-            const pdf = new jsPDF();
+            const container = document.getElementById('canvasContainer');
+            const pdf = new jsPDF({
+                orientation: container.clientWidth > container.clientHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [container.clientWidth, container.clientHeight]
+            });
 
-            for (let i = 0; i < canvases.length; i++) {
-                const canvas = canvases[i];
-                if (i > 0) {
-                    pdf.addPage();
-                }
-                const imgData = canvas.toDataURL('image/png');
-                pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.width, pdf.internal.pageSize.height);
+            const canvases = document.getElementsByTagName('canvas');
+            const canvasContainer = document.createElement('canvas');
+            const context = canvasContainer.getContext('2d');
+            canvasContainer.width = container.clientWidth;
+            canvasContainer.height = container.clientHeight;
+
+            for (let canvas of canvases) {
+                context.drawImage(canvas, 0, 0);
             }
 
-            pdf.save('merged.pdf');
+            const imgData = canvasContainer.toDataURL('image/png');
+            pdf.addImage(imgData, 'PNG', 0, 0, container.clientWidth, container.clientHeight);
+
+            pdf.save('current_view.pdf');
         }
 
         window.addEventListener('resize', fitCanvasesToContainer);
@@ -219,5 +227,6 @@
     </script>
 </body>
 </html>
+
 
 
