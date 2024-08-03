@@ -42,7 +42,7 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló MenüR1</h2>
+            <h2>Rajzoló Menü</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
@@ -182,10 +182,13 @@
         function startDrawing(type) {
             drawType = type;
             drawing = true;
+            document.getElementById('canvasContainer').style.cursor = 'crosshair';
         }
 
         function stopDrawing() {
             drawing = false;
+            drawType = '';
+            document.getElementById('canvasContainer').style.cursor = 'default';
         }
 
         function draw(e) {
@@ -213,7 +216,9 @@
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
                 drawingContext.fillText(text, x, y);
+                saveDrawing();
                 stopDrawing();
+                return;
             }
         }
 
@@ -231,21 +236,14 @@
             context1.drawImage(drawingCanvas, 0, 0);
             context2.drawImage(drawingCanvas, 0, 0);
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+            stopDrawing();
         }
 
         function undoLast() {
             if (actions.length === 0) return;
             actions.pop();
-            const imgData = actions[actions.length - 1] || '';
-            const img = new Image();
-            img.src = imgData;
-            img.onload = () => {
-                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-                if (imgData) {
-                    drawingContext.drawImage(img, 0, 0);
-                }
-                redrawMainCanvases();
-            };
+            redrawMainCanvases();
         }
 
         function redrawMainCanvases() {
@@ -255,8 +253,9 @@
             const context2 = mainCanvas2.getContext('2d');
             context1.clearRect(0, 0, mainCanvas1.width, mainCanvas1.height);
             context2.clearRect(0, 0, mainCanvas2.width, mainCanvas2.height);
+
             const img = new Image();
-            img.src = drawingCanvas.toDataURL();
+            img.src = actions[actions.length - 1] || '';
             img.onload = () => {
                 context1.drawImage(img, 0, 0);
                 context2.drawImage(img, 0, 0);
@@ -299,7 +298,9 @@
                 document.addEventListener('mousemove', draw);
                 document.addEventListener('mouseup', () => {
                     document.removeEventListener('mousemove', draw);
-                    saveDrawing();
+                    if (drawType !== 'text') {
+                        saveDrawing();
+                    }
                 }, { once: true });
             } else {
                 canvasDragging = true;
