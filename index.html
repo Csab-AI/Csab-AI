@@ -30,7 +30,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF Összehasonlító</h1>
+        <h1>PDF ÖsszehasonlítóR</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -76,37 +76,30 @@
 
                 const canvas = document.getElementById(canvasId);
                 const context = canvas.getContext('2d');
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
+                const container = document.getElementById('canvasContainer');
+                const scaleX = container.clientWidth / viewport.width;
+                const scaleY = container.clientHeight / viewport.height;
+                const scale = Math.min(scaleX, scaleY);
+                const scaledViewport = page.getViewport({scale: scale});
+
+                canvas.width = scaledViewport.width;
+                canvas.height = scaledViewport.height;
 
                 const renderContext = {
                     canvasContext: context,
-                    viewport: viewport
+                    viewport: scaledViewport
                 };
                 await page.render(renderContext).promise;
                 console.log('Oldal renderelve');
-
-                // Scale the canvas to fit its container
-                fitCanvasToContainer(canvas);
             };
             reader.readAsArrayBuffer(file);
-        }
-
-        function fitCanvasToContainer(canvas) {
-            const container = document.getElementById('canvasContainer');
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-            const scaleX = containerWidth / canvas.width;
-            const scaleY = containerHeight / canvas.height;
-            const scale = Math.min(scaleX, scaleY);
-            canvas.style.transform = `scale(${scale})`;
-            canvas.style.transformOrigin = 'top left';
         }
 
         function fitCanvasesToContainer() {
             const canvases = document.getElementsByTagName('canvas');
             for (let canvas of canvases) {
-                fitCanvasToContainer(canvas);
+                canvas.style.width = '100%';
+                canvas.style.height = '100%';
             }
         }
 
@@ -139,3 +132,4 @@
     </script>
 </body>
 </html>
+
