@@ -13,15 +13,16 @@
             margin: 0 auto;
             text-align: center;
         }
-        #pdf1, #pdf2 {
-            width: 45%;
+        #canvasContainer {
+            position: relative;
+            width: 100%;
             height: 500px;
             border: 1px solid #000;
-            margin: 10px;
-            display: inline-block;
         }
-        #output {
-            margin-top: 20px;
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
         }
     </style>
 </head>
@@ -31,25 +32,34 @@
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
-        <div id="output">
-            <div id="pdf1"></div>
-            <div id="pdf2"></div>
+        <div>
+            <label>Átlátszóság:</label>
+            <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <button onclick="startBlinking()">Villogtatás</button>
+        <button onclick="stopBlinking()">Villogtatás Leállítása</button>
+        <div id="canvasContainer">
+            <canvas id="canvas1"></canvas>
+            <canvas id="canvas2"></canvas>
         </div>
     </div>
     <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
     <script>
+        let blinking = false;
+        let blinkInterval;
+        
         function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
             const file2 = document.getElementById('file2').files[0];
             if (file1 && file2) {
-                displayPDF(file1, 'pdf1');
-                displayPDF(file2, 'pdf2');
+                displayPDF(file1, 'canvas1');
+                displayPDF(file2, 'canvas2');
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
             }
         }
 
-        function displayPDF(file, containerId) {
+        function displayPDF(file, canvasId) {
             const reader = new FileReader();
             reader.onload = function() {
                 const pdfData = new Uint8Array(reader.result);
@@ -62,7 +72,7 @@
                         const scale = 1.5;
                         const viewport = page.getViewport({scale: scale});
 
-                        const canvas = document.createElement('canvas');
+                        const canvas = document.getElementById(canvasId);
                         const context = canvas.getContext('2d');
                         canvas.height = viewport.height;
                         canvas.width = viewport.width;
@@ -73,7 +83,6 @@
                         };
                         page.render(renderContext).promise.then(function() {
                             console.log('Oldal renderelve');
-                            document.getElementById(containerId).appendChild(canvas);
                         });
                     });
                 }, function(reason) {
@@ -82,6 +91,32 @@
             };
             reader.readAsArrayBuffer(file);
         }
+
+        function updateAlpha() {
+            const alpha = document.getElementById('alphaSlider').value;
+            const canvas2 = document.getElementById('canvas2');
+            canvas2.style.opacity = alpha;
+        }
+
+        document.getElementById('alphaSlider').addEventListener('input', updateAlpha);
+
+        function startBlinking() {
+            blinking = true;
+            blink();
+        }
+
+        function stopBlinking() {
+            blinking = false;
+            clearInterval(blinkInterval);
+        }
+
+        function blink() {
+            if (!blinking) return;
+            const canvas2 = document.getElementById('canvas2');
+            canvas2.style.opacity = canvas2.style.opacity == 0 ? 1 : 0;
+            blinkInterval = setTimeout(blink, 500);
+        }
     </script>
 </body>
 </html>
+
