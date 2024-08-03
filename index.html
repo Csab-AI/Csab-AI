@@ -2,21 +2,33 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Összehasonlító</title>
+    <title>PDF Összehasonlító és Rajzoló</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            text-align: center;
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        .menu {
+            display: flex;
+            flex-direction: column;
+            width: 200px;
+            padding: 10px;
+            box-sizing: border-box;
+            border-right: 1px solid #000;
+        }
+        .menu button, .menu input {
+            margin-bottom: 10px;
         }
         #canvasContainer {
             position: relative;
-            width: 100%;
-            height: 500px;
+            flex-grow: 1;
             border: 1px solid #000;
             overflow: hidden;
         }
@@ -29,25 +41,52 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF Összehasonlító</h1>
-        <input type="file" id="file1" accept="application/pdf">
-        <input type="file" id="file2" accept="application/pdf">
-        <button onclick="comparePDFs()">Összehasonlítás</button>
-        <div>
+        <div class="menu">
+            <h2>Rajzoló Menü</h2>
+            <button onclick="startDrawing('line')">Vonal Rajzolása</button>
+            <button onclick="startDrawing('circle')">Kör Rajzolása</button>
+            <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
+            <input type="color" id="colorPicker" value="#000000">
+            <input type="text" id="textInput" placeholder="Felirat szövege">
+            <button onclick="undoLast()">Utolsó Lépés Visszavonása</button>
+            <input type="file" id="file1" accept="application/pdf">
+            <input type="file" id="file2" accept="application/pdf">
+            <button onclick="comparePDFs()">Összehasonlítás</button>
             <label>Átlátszóság:</label>
             <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
+            <button onclick="startBlinking()">Villogtatás</button>
+            <button onclick="stopBlinking()">Villogtatás Leállítása</button>
+            <button onclick="resetView()">Eredeti nézet visszaállítása</button>
+            <button onclick="saveAsPDF()">Mentés PDF-be</button>
         </div>
-        <button onclick="startBlinking()">Villogtatás</button>
-        <button onclick="stopBlinking()">Villogtatás Leállítása</button>
         <div id="canvasContainer">
             <canvas id="canvas1"></canvas>
             <canvas id="canvas2"></canvas>
+            <canvas id="drawingCanvas"></canvas>
         </div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-alpha1/html2canvas.min.js"></script>
     <script>
         let blinking = false;
         let blinkInterval;
+        let originalScale = 1;
+        let offsetX = 0, offsetY = 0, scale = 1;
+        let drawing = false;
+        let drawType = '';
+        let startX, startY;
+        let drawingCanvas, drawingContext;
+        let color = '#000000';
+        let actions = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            drawingCanvas = document.getElementById('drawingCanvas');
+            drawingContext = drawingCanvas.getContext('2d');
+            document.getElementById('colorPicker').addEventListener('input', (e) => {
+                color = e.target.value;
+            });
+        });
 
         async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
@@ -56,6 +95,7 @@
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
                 fitCanvasesToContainer();
+                resetView();
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
             }
@@ -80,6 +120,7 @@
                 const scaleY = container.clientHeight / viewport.height;
                 const scale = Math.min(scaleX, scaleY);
                 const scaledViewport = page.getViewport({scale: scale});
+                originalScale = scale;
 
                 canvas.width = scaledViewport.width;
                 canvas.height = scaledViewport.height;
@@ -90,6 +131,10 @@
                 };
                 await page.render(renderContext).promise;
                 console.log('Oldal renderelve');
+
+                // Update drawing canvas size
+                drawingCanvas.width = canvas.width;
+                drawingCanvas.height = canvas.height;
             };
             reader.readAsArrayBuffer(file);
         }
@@ -127,29 +172,142 @@
             blinkInterval = setTimeout(blink, 500);
         }
 
+        function resetView() {
+            scale = originalScale;
+            offsetX = 0;
+            offsetY = 0;
+            updateTransform();
+        }
+
+        function startDrawing(type) {
+            drawType = type;
+            drawing = true;
+        }
+
+        function stopDrawing() {
+            drawing = false;
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+
+            const rect = drawingCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+            drawingContext.strokeStyle = color;
+            drawingContext.fillStyle = color;
+
+            if (drawType === 'line') {
+                drawingContext.beginPath();
+                drawingContext.moveTo(startX, startY);
+                drawingContext.lineTo(x, y);
+                drawingContext.stroke();
+            } else if (drawType === 'circle') {
+                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                drawingContext.beginPath();
+                drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
+                drawingContext.stroke();
+            } else if (drawType === 'text') {
+                const text = document.getElementById('textInput').value;
+                drawingContext.fillText(text, x, y);
+                stopDrawing();
+            }
+        }
+
+        function saveDrawing() {
+            const drawingImage = drawingCanvas.toDataURL();
+            actions.push(drawingImage);
+            if (actions.length > 5) {
+                actions.shift();
+            }
+
+            const mainCanvas1 = document.getElementById('canvas1');
+            const mainCanvas2 = document.getElementById('canvas2');
+            const context1 = mainCanvas1.getContext('2d');
+            const context2 = mainCanvas2.getContext('2d');
+            context1.drawImage(drawingCanvas, 0, 0);
+            context2.drawImage(drawingCanvas, 0, 0);
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
+
+        function undoLast() {
+            if (actions.length === 0) return;
+            actions.pop();
+            const imgData = actions[actions.length - 1] || '';
+            const img = new Image();
+            img.src = imgData;
+            img.onload = () => {
+                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawingContext.drawImage(img, 0, 0);
+                const mainCanvas1 = document.getElementById('canvas1');
+                const mainCanvas2 = document.getElementById('canvas2');
+                const context1 = mainCanvas1.getContext('2d');
+                const context2 = mainCanvas2.getContext('2d');
+                context1.clearRect(0, 0, mainCanvas1.width, mainCanvas1.height);
+                context2.clearRect(0, 0, mainCanvas2.width, mainCanvas2.height);
+                context1.drawImage(img, 0, 0);
+                context2.drawImage(img, 0, 0);
+            };
+        }
+
+        async function saveAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const container = document.getElementById('canvasContainer');
+            
+            html2canvas(container, {
+                scale: 2,
+                useCORS: true
+            }).then(canvas => {
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save('current_view.pdf');
+            });
+        }
+
         window.addEventListener('resize', fitCanvasesToContainer);
 
         // Zoom and Pan functionality
         let isDragging = false;
-        let startX, startY;
-        let offsetX = 0, offsetY = 0;
-        let scale = 1;
+        let canvasDragging = false;
+        let canvasStartX, canvasStartY;
 
         const container = document.getElementById('canvasContainer');
         container.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX - offsetX;
-            startY = e.clientY - offsetY;
+            if (drawing) {
+                const rect = e.target.getBoundingClientRect();
+                startX = (e.clientX - rect.left) / scale;
+                startY = (e.clientY - rect.top) / scale;
+                document.addEventListener('mousemove', draw);
+                document.addEventListener('mouseup', () => {
+                    document.removeEventListener('mousemove', draw);
+                    saveDrawing();
+                }, { once: true });
+            } else {
+                canvasDragging = true;
+                canvasStartX = e.clientX - offsetX;
+                canvasStartY = e.clientY - offsetY;
+            }
         });
 
         container.addEventListener('mouseup', () => {
-            isDragging = false;
+            if (canvasDragging) {
+                canvasDragging = false;
+            }
         });
 
         container.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                offsetX = e.clientX - startX;
-                offsetY = e.clientY - startY;
+            if (canvasDragging) {
+                offsetX = e.clientX - canvasStartX;
+                offsetY = e.clientY - canvasStartY;
                 updateTransform();
             }
         });
