@@ -18,19 +18,18 @@
             width: 100%;
             height: 500px;
             border: 1px solid #000;
+            overflow: hidden;
         }
         canvas {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR</h1>
+        <h1>PDF Összehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -129,7 +128,47 @@
         }
 
         window.addEventListener('resize', fitCanvasesToContainer);
+
+        // Zoom and Pan functionality
+        let isDragging = false;
+        let startX, startY;
+        let offsetX = 0, offsetY = 0;
+        let scale = 1;
+
+        const container = document.getElementById('canvasContainer');
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - offsetX;
+            startY = e.clientY - offsetY;
+        });
+
+        container.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                offsetX = e.clientX - startX;
+                offsetY = e.clientY - startY;
+                updateTransform();
+            }
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            scale *= delta;
+            offsetX = (e.clientX - container.clientWidth / 2) * (1 - delta) + offsetX;
+            offsetY = (e.clientY - container.clientHeight / 2) * (1 - delta) + offsetY;
+            updateTransform();
+        });
+
+        function updateTransform() {
+            const canvases = document.getElementsByTagName('canvas');
+            for (let canvas of canvases) {
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+            }
+        }
     </script>
 </body>
 </html>
-
