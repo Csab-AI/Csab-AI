@@ -42,7 +42,7 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
+            <h2>Rajzoló MenüR2</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
@@ -210,11 +210,15 @@
                 drawingContext.moveTo(startX, startY);
                 drawingContext.lineTo(x, y);
                 drawingContext.stroke();
+                saveDrawing();
+                stopDrawing();
             } else if (drawType === 'circle') {
                 const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
                 drawingContext.beginPath();
                 drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
                 drawingContext.stroke();
+                saveDrawing();
+                stopDrawing();
             } else if (drawType === 'text') {
                 const text = document.getElementById('textInput').value;
                 drawingContext.textAlign = "center";
@@ -306,7 +310,7 @@
         });
 
         container.addEventListener('wheel', (e) => {
-            e.preventDefault();
+            e.prevent.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             scale *= delta;
             offsetX = (e.clientX - container.clientWidth / 2) * (1 - delta) + offsetX;
@@ -323,3 +327,4 @@
     </script>
 </body>
 </html>
+
