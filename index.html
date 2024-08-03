@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <title>PDF ÖsszehasonlítóR1</title>
+    <title>PDF Összehasonlító</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -28,7 +28,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF Összehasonlító</h1>
+        <h1>PDF ÖsszehasonlítóR2</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -43,51 +43,46 @@
             <canvas id="canvas2"></canvas>
         </div>
     </div>
-    <script src="https://mozilla.github.io/pdf.js/build/pdf.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
     <script>
         let blinking = false;
         let blinkInterval;
 
-        function comparePDFs() {
+        async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
             const file2 = document.getElementById('file2').files[0];
             if (file1 && file2) {
-                displayPDF(file1, 'canvas1');
-                displayPDF(file2, 'canvas2');
+                await displayPDF(file1, 'canvas1');
+                await displayPDF(file2, 'canvas2');
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
             }
         }
 
-        function displayPDF(file, canvasId) {
+        async function displayPDF(file, canvasId) {
             const reader = new FileReader();
-            reader.onload = function() {
+            reader.onload = async function() {
                 const pdfData = new Uint8Array(reader.result);
                 const loadingTask = pdfjsLib.getDocument({data: pdfData});
-                loadingTask.promise.then(function(pdf) {
-                    console.log('PDF betöltve:', pdf);
-                    const pageNumber = 1;
-                    pdf.getPage(pageNumber).then(function(page) {
-                        console.log('Oldal:', page);
-                        const scale = 1.5;
-                        const viewport = page.getViewport({scale: scale});
+                const pdf = await loadingTask.promise;
+                console.log('PDF betöltve:', pdf);
+                const pageNumber = 1;
+                const page = await pdf.getPage(pageNumber);
+                console.log('Oldal:', page);
+                const scale = 1.5;
+                const viewport = page.getViewport({scale: scale});
 
-                        const canvas = document.getElementById(canvasId);
-                        const context = canvas.getContext('2d');
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
+                const canvas = document.getElementById(canvasId);
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
 
-                        const renderContext = {
-                            canvasContext: context,
-                            viewport: viewport
-                        };
-                        page.render(renderContext).promise.then(function() {
-                            console.log('Oldal renderelve');
-                        });
-                    });
-                }, function(reason) {
-                    console.error('Hiba a PDF betöltésekor:', reason);
-                });
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                await page.render(renderContext).promise;
+                console.log('Oldal renderelve');
             };
             reader.readAsArrayBuffer(file);
         }
@@ -119,4 +114,3 @@
     </script>
 </body>
 </html>
-
