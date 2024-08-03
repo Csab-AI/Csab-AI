@@ -23,7 +23,7 @@
             box-sizing: border-box;
             border-right: 1px solid #000;
         }
-        .menu button {
+        .menu button, .menu input {
             margin-bottom: 10px;
         }
         #canvasContainer {
@@ -42,11 +42,13 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
+            <h2>Rajzoló MenüR1</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
+            <input type="color" id="colorPicker" value="#000000">
             <input type="text" id="textInput" placeholder="Felirat szövege">
+            <button onclick="undoLast()">Utolsó Lépés Visszavonása</button>
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
             <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -75,10 +77,16 @@
         let drawType = '';
         let startX, startY;
         let drawingCanvas, drawingContext;
+        let color = '#000000';
+        let actions = [];
+        let undoStack = [];
 
         document.addEventListener("DOMContentLoaded", () => {
             drawingCanvas = document.getElementById('drawingCanvas');
             drawingContext = drawingCanvas.getContext('2d');
+            document.getElementById('colorPicker').addEventListener('input', (e) => {
+                color = e.target.value;
+            });
         });
 
         async function comparePDFs() {
@@ -190,6 +198,9 @@
 
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
+            drawingContext.strokeStyle = color;
+            drawingContext.fillStyle = color;
+
             if (drawType === 'line') {
                 drawingContext.beginPath();
                 drawingContext.moveTo(startX, startY);
@@ -214,7 +225,24 @@
             const context2 = mainCanvas2.getContext('2d');
             context1.drawImage(drawingCanvas, 0, 0);
             context2.drawImage(drawingCanvas, 0, 0);
+            actions.push(drawingCanvas.toDataURL());
+            if (actions.length > 5) {
+                actions.shift();
+            }
             drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        }
+
+        function undoLast() {
+            if (actions.length === 0) return;
+            undoStack.push(actions.pop());
+            const imgData = actions[actions.length - 1];
+            const img = new Image();
+            img.src = imgData;
+            img.onload = () => {
+                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawingContext.drawImage(img, 0, 0);
+                saveDrawing();
+            };
         }
 
         async function saveAsPDF() {
