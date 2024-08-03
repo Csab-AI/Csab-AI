@@ -47,7 +47,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR2</h1>
+        <h1>PDF Összehasonlító</h1>
         <div class="controls">
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
@@ -66,6 +66,7 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.4.1/html2canvas.min.js"></script>
     <script>
         let blinking = false;
         let blinkInterval;
@@ -162,26 +163,21 @@
         async function saveAsPDF() {
             const { jsPDF } = window.jspdf;
             const container = document.getElementById('canvasContainer');
-            const pdf = new jsPDF({
-                orientation: container.clientWidth > container.clientHeight ? 'landscape' : 'portrait',
-                unit: 'px',
-                format: [container.clientWidth, container.clientHeight]
+            
+            html2canvas(container, {
+                scale: 2,
+                useCORS: true
+            }).then(canvas => {
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save('current_view.pdf');
             });
-
-            const canvases = document.getElementsByTagName('canvas');
-            const canvasContainer = document.createElement('canvas');
-            const context = canvasContainer.getContext('2d');
-            canvasContainer.width = container.clientWidth;
-            canvasContainer.height = container.clientHeight;
-
-            for (let canvas of canvases) {
-                context.drawImage(canvas, 0, 0);
-            }
-
-            const imgData = canvasContainer.toDataURL('image/png');
-            pdf.addImage(imgData, 'PNG', 0, 0, container.clientWidth, container.clientHeight);
-
-            pdf.save('current_view.pdf');
         }
 
         window.addEventListener('resize', fitCanvasesToContainer);
@@ -227,6 +223,3 @@
     </script>
 </body>
 </html>
-
-
-
