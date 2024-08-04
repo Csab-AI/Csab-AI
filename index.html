@@ -6,21 +6,24 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
+            padding: 0;
             display: flex;
+            height: 100vh;
+            overflow: hidden;
         }
         .menu {
             width: 200px;
-            padding-right: 20px;
+            padding: 10px;
             border-right: 1px solid #000;
+            box-sizing: border-box;
         }
         .canvas-container {
             flex-grow: 1;
             position: relative;
-            overflow: hidden;
+            overflow: auto;
             background: #f0f0f0;
             border: 1px solid #000;
-            cursor: grab;
         }
         canvas {
             position: absolute;
@@ -35,7 +38,7 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF Összehasonlító</h1>
+        <h1>PDF sszehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -109,33 +112,22 @@
                 await page.render(renderContext).promise;
 
                 // Ensure the canvas stays the same size as the PDF page
-                canvas.style.top = '0';
-                canvas.style.left = '0';
-                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+                canvas.style.width = `${viewport.width}px`;
+                canvas.style.height = `${viewport.height}px`;
             };
             reader.readAsArrayBuffer(file);
         }
 
         function fitCanvasesToContainer() {
-            const canvases = document.getElementsByTagName('canvas');
-            let maxWidth = 0;
-            let maxHeight = 0;
+            const container = document.getElementById('canvasContainer');
+            const canvas1 = document.getElementById('canvas1');
+            const canvas2 = document.getElementById('canvas2');
 
-            // Determine maximum width and height needed
-            for (const canvas of canvases) {
-                maxWidth = Math.max(maxWidth, canvas.width);
-                maxHeight = Math.max(maxHeight, canvas.height);
-            }
+            const maxWidth = Math.max(canvas1.width, canvas2.width);
+            const maxHeight = Math.max(canvas1.height, canvas2.height);
 
-            // Adjust canvas container size
-            const container = document.querySelector('.canvas-container');
             container.style.width = `${maxWidth}px`;
             container.style.height = `${maxHeight}px`;
-
-            // Center canvases
-            for (const canvas of canvases) {
-                canvas.style.position = 'absolute';
-            }
         }
 
         function updateAlpha() {
