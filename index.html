@@ -42,7 +42,7 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló MenüR1</h2>
+            <h2>Rajzoló Menü</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
@@ -64,7 +64,7 @@
             <canvas id="drawingCanvas"></canvas>
         </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.18.0/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-alpha1/html2canvas.min.js"></script>
     <script>
@@ -86,6 +86,7 @@
             document.getElementById('colorPicker').addEventListener('input', (e) => {
                 color = e.target.value;
             });
+            fitCanvasesToContainer();  // Ensure canvases are correctly sized initially
         });
 
         async function comparePDFs() {
@@ -109,10 +110,8 @@
                 const pdfData = new Uint8Array(reader.result);
                 const loadingTask = pdfjsLib.getDocument({data: pdfData});
                 const pdf = await loadingTask.promise;
-                console.log('PDF betöltve:', pdf);
                 const pageNumber = 1;
                 const page = await pdf.getPage(pageNumber);
-                console.log('Oldal:', page);
                 const viewport = page.getViewport({scale: 1});
 
                 const canvas = document.getElementById(canvasId);
@@ -121,18 +120,16 @@
                 const scaleX = container.clientWidth / viewport.width;
                 const scaleY = container.clientHeight / viewport.height;
                 const scale = Math.min(scaleX, scaleY);
+
+                canvas.width = viewport.width * scale;
+                canvas.height = viewport.height * scale;
+
                 const scaledViewport = page.getViewport({scale: scale});
-                originalScale = scale;
-
-                canvas.width = scaledViewport.width;
-                canvas.height = scaledViewport.height;
-
                 const renderContext = {
                     canvasContext: context,
                     viewport: scaledViewport
                 };
                 await page.render(renderContext).promise;
-                console.log('Oldal renderelve');
 
                 // Update drawing canvas size
                 drawingCanvas.width = canvas.width;
@@ -257,8 +254,8 @@
                 
                 // Adding the file names to the PDF
                 pdf.setFontSize(10);
-                pdf.text(File 1: ${file1Name}, 10, pdf.internal.pageSize.height - 20);
-                pdf.text(File 2: ${file2Name}, 10, pdf.internal.pageSize.height - 10);
+                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
+                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
 
                 pdf.save('current_view.pdf');
             });
@@ -317,9 +314,10 @@
         function updateTransform() {
             const canvases = document.getElementsByTagName('canvas');
             for (let canvas of canvases) {
-                canvas.style.transform = translate(${offsetX}px, ${offsetY}px) scale(${scale});
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
             }
         }
     </script>
 </body>
 </html>
+
