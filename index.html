@@ -197,25 +197,33 @@
             }
         }
 
-        function saveCurrentView() {
+        async function saveCurrentView() {
             const canvases = document.getElementsByTagName('canvas');
             if (canvases.length === 0) return;
 
+            // Create an image from each canvas
             const canvas1 = document.getElementById('canvas1');
             const canvas2 = document.getElementById('canvas2');
-
-            const pdf = new jsPDF.jsPDF('p', 'pt', 'a4');
             const img1 = canvas1.toDataURL('image/png');
             const img2 = canvas2.toDataURL('image/png');
 
-            pdf.addImage(img1, 'PNG', 10, 10);
+            // Create PDF
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'pt', 'a4');
+
+            // Add first image
+            pdf.addImage(img1, 'PNG', 10, 10, 190, 277); // Adjust size and position if needed
+
+            // Add second page for the second image
             pdf.addPage();
-            pdf.addImage(img2, 'PNG', 10, 10);
+            pdf.addImage(img2, 'PNG', 10, 10, 190, 277); // Adjust size and position if needed
 
+            // Add file names
             pdf.setFontSize(12);
-            pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
-            pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
+            pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 30);
+            pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 15);
 
+            // Save PDF
             pdf.save('current_view.pdf');
         }
 
