@@ -21,6 +21,7 @@
             overflow: hidden;
             background: #f0f0f0;
             border: 1px solid #000;
+            cursor: grab;
         }
         canvas {
             position: absolute;
@@ -35,7 +36,7 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF Összehasonlító1</h1>
+        <h1>PDF Összehasonlító2</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -50,7 +51,7 @@
             <button onclick="saveCurrentView()">Aktuális Nézet Mentése</button>
         </div>
     </div>
-    <div class="canvas-container">
+    <div class="canvas-container" id="canvasContainer">
         <canvas id="canvas1"></canvas>
         <canvas id="canvas2"></canvas>
     </div>
@@ -104,29 +105,18 @@
                 const context = canvas.getContext('2d');
                 const container = document.querySelector('.canvas-container');
                 
-                // Get container size
-                const containerWidth = container.clientWidth;
-                const containerHeight = container.clientHeight;
-
-                // Calculate the scale to fit the page in the container while maintaining aspect ratio
-                const scaleX = containerWidth / viewport.width;
-                const scaleY = containerHeight / viewport.height;
-                const scale = Math.min(scaleX, scaleY);
-
-                const scaledViewport = page.getViewport({scale: scale});
-
-                // Set canvas dimensions
-                canvas.width = scaledViewport.width;
-                canvas.height = scaledViewport.height;
+                // Set canvas dimensions to original PDF size
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
 
                 const renderContext = {
                     canvasContext: context,
-                    viewport: scaledViewport
+                    viewport: viewport
                 };
                 await page.render(renderContext).promise;
                 
                 // Update canvas size for responsive layout
-                updateCanvasSize(canvas, containerWidth, containerHeight, viewport.width, viewport.height);
+                updateCanvasSize(canvas, container.clientWidth, container.clientHeight, viewport.width, viewport.height);
             };
             reader.readAsArrayBuffer(file);
         }
