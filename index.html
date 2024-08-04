@@ -21,6 +21,7 @@
             display: flex;
             justify-content: space-around;
             align-items: center;
+            flex-shrink: 0;
         }
         .canvas-container {
             flex-grow: 1;
@@ -44,7 +45,7 @@
 <body>
     <div class="menu">
         <div>
-            <h1>PDF Összehasonlító</h1>
+            <h1>PDF Összehasonlító2</h1>
         </div>
         <div>
             <input type="file" id="file1" accept="application/pdf">
@@ -77,6 +78,8 @@
         let isDragging = false;
         let startX, startY;
         let file1Name = '', file2Name = '';
+        let maxWidth = 0;
+        let maxHeight = 0;
 
         async function comparePDFs() {
             const file1 = document.getElementById('file1').files[0];
@@ -84,6 +87,10 @@
             if (file1 && file2) {
                 file1Name = file1.name;
                 file2Name = file2.name;
+
+                // Reset maxWidth and maxHeight
+                maxWidth = 0;
+                maxHeight = 0;
 
                 // Display PDFs
                 await displayPDF(file1, 'canvas1');
@@ -113,6 +120,10 @@
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
 
+                // Update maxWidth and maxHeight
+                maxWidth = Math.max(maxWidth, viewport.width);
+                maxHeight = Math.max(maxHeight, viewport.height);
+
                 // Render the page
                 const renderContext = {
                     canvasContext: context,
@@ -129,12 +140,6 @@
 
         function fitCanvasesToContainer() {
             const container = document.getElementById('canvasContainer');
-            const canvas1 = document.getElementById('canvas1');
-            const canvas2 = document.getElementById('canvas2');
-
-            const maxWidth = Math.max(canvas1.width, canvas2.width);
-            const maxHeight = Math.max(canvas1.height, canvas2.height);
-
             container.style.width = `${maxWidth}px`;
             container.style.height = `${maxHeight}px`;
 
