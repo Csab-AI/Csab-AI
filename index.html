@@ -30,7 +30,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>PDF ÖsszehasonlítóR</h1>
+        <h1>PDF Összehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -54,15 +54,25 @@
             const file1 = document.getElementById('file1').files[0];
             const file2 = document.getElementById('file2').files[0];
             if (file1 && file2) {
-                await displayPDF(file1, 'canvas1');
-                await displayPDF(file2, 'canvas2');
+                const canvas1 = document.getElementById('canvas1');
+                const canvas2 = document.getElementById('canvas2');
+                
+                // Reset canvas sizes before rendering
+                resetCanvasSize(canvas1);
+                resetCanvasSize(canvas2);
+                
+                // Display PDFs
+                await displayPDF(file1, canvas1);
+                await displayPDF(file2, canvas2);
+                
+                // Adjust canvas sizes to fit the container
                 fitCanvasesToContainer();
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
             }
         }
 
-        async function displayPDF(file, canvasId) {
+        async function displayPDF(file, canvas) {
             const reader = new FileReader();
             reader.onload = async function() {
                 const pdfData = new Uint8Array(reader.result);
@@ -74,14 +84,21 @@
                 console.log('Oldal:', page);
                 const viewport = page.getViewport({scale: 1});
 
-                const canvas = document.getElementById(canvasId);
                 const context = canvas.getContext('2d');
                 const container = document.getElementById('canvasContainer');
-                const scaleX = container.clientWidth / viewport.width;
-                const scaleY = container.clientHeight / viewport.height;
-                const scale = Math.min(scaleX, scaleY);
-                const scaledViewport = page.getViewport({scale: scale});
+                
+                // Get container size
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
 
+                // Calculate the scale to fit the page in the container while maintaining aspect ratio
+                const scaleX = containerWidth / viewport.width;
+                const scaleY = containerHeight / viewport.height;
+                const scale = Math.min(scaleX, scaleY);
+
+                const scaledViewport = page.getViewport({scale: scale});
+                
+                // Set canvas dimensions
                 canvas.width = scaledViewport.width;
                 canvas.height = scaledViewport.height;
 
@@ -91,8 +108,29 @@
                 };
                 await page.render(renderContext).promise;
                 console.log('Oldal renderelve');
+                
+                // Update canvas size for responsive layout
+                updateCanvasSize(canvas, containerWidth, containerHeight, viewport.width, viewport.height);
             };
             reader.readAsArrayBuffer(file);
+        }
+
+        function resetCanvasSize(canvas) {
+            canvas.style.width = 'auto';
+            canvas.style.height = 'auto';
+        }
+
+        function updateCanvasSize(canvas, containerWidth, containerHeight, pdfWidth, pdfHeight) {
+            const aspectRatio = pdfWidth / pdfHeight;
+            const containerAspectRatio = containerWidth / containerHeight;
+
+            if (containerAspectRatio > aspectRatio) {
+                canvas.style.height = '100%';
+                canvas.style.width = 'auto';
+            } else {
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+            }
         }
 
         function fitCanvasesToContainer() {
