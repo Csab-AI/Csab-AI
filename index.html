@@ -19,6 +19,8 @@
             position: relative;
             height: 500px;
             overflow: hidden;
+            background: #f0f0f0;
+            border: 1px solid #000;
         }
         canvas {
             position: absolute;
@@ -33,7 +35,7 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF Összehasonlító</h1>
+        <h1>PDF Összehasonlító1</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -226,12 +228,14 @@
 
             // Add file names
             pdf.setFontSize(12);
-            pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 30);
-            pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 15);
+            pdf.text(`File 1: ${file1Name}`, 10, 290);
+            pdf.text(`File 2: ${file2Name}`, 10, 310);
 
-            // Save PDF
-            pdf.save('current_view.pdf');
+            // Save the PDF
+            pdf.save('saved_view.pdf');
         }
+
+        window.addEventListener('resize', fitCanvasesToContainer);
 
         // Event listeners for dragging and zooming
         const container = document.querySelector('.canvas-container');
@@ -262,8 +266,6 @@
             scale *= delta;
             updateTransform();
         });
-
-        window.addEventListener('resize', fitCanvasesToContainer);
     </script>
 </body>
 </html>
