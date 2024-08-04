@@ -35,7 +35,7 @@
 </head>
 <body>
     <div class="menu">
-        <h2>PDF Összehasonlító</h2>
+        <h1>PDF Összehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -101,6 +101,7 @@
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
 
+                // Render the page
                 const renderContext = {
                     canvasContext: context,
                     viewport: viewport
@@ -110,7 +111,7 @@
                 // Ensure the canvas stays the same size as the PDF page
                 canvas.style.top = '0';
                 canvas.style.left = '0';
-                updateCanvasPosition(canvas);
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
             };
             reader.readAsArrayBuffer(file);
         }
@@ -119,7 +120,7 @@
             const canvases = document.getElementsByTagName('canvas');
             let maxWidth = 0;
             let maxHeight = 0;
-            
+
             // Determine maximum width and height needed
             for (const canvas of canvases) {
                 maxWidth = Math.max(maxWidth, canvas.width);
@@ -130,6 +131,11 @@
             const container = document.querySelector('.canvas-container');
             container.style.width = `${maxWidth}px`;
             container.style.height = `${maxHeight}px`;
+
+            // Center canvases
+            for (const canvas of canvases) {
+                canvas.style.position = 'absolute';
+            }
         }
 
         function updateAlpha() {
