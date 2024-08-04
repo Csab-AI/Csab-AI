@@ -35,7 +35,7 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF Összehasonlító</h1>
+        <h2>PDF Összehasonlító</h2>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -73,14 +73,11 @@
                 file1Name = file1.name;
                 file2Name = file2.name;
 
-                // Reset canvas sizes and visibility
-                resetCanvasSize();
-
                 // Display PDFs
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
 
-                // Adjust canvas positions
+                // Adjust canvas sizes and positions
                 fitCanvasesToContainer();
             } else {
                 alert('Kérjük, válassza ki mindkét PDF fájlt.');
@@ -111,43 +108,28 @@
                 await page.render(renderContext).promise;
 
                 // Ensure the canvas stays the same size as the PDF page
+                canvas.style.top = '0';
+                canvas.style.left = '0';
                 updateCanvasPosition(canvas);
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function resetCanvasSize() {
-            const canvases = document.getElementsByTagName('canvas');
-            for (let canvas of canvases) {
-                canvas.style.width = 'auto';
-                canvas.style.height = 'auto';
-                canvas.style.transform = 'none';
-            }
-        }
-
-        function updateCanvasPosition(canvas) {
-            // Position canvas at top-left corner
-            canvas.style.top = '0';
-            canvas.style.left = '0';
-        }
-
         function fitCanvasesToContainer() {
             const canvases = document.getElementsByTagName('canvas');
-            for (let canvas of canvases) {
-                const container = document.querySelector('.canvas-container');
-                const containerWidth = container.clientWidth;
-                const containerHeight = container.clientHeight;
-
-                // Adjust canvas size to fit container without stretching
-                const aspectRatio = canvas.width / canvas.height;
-                if (containerWidth / containerHeight > aspectRatio) {
-                    canvas.style.width = 'auto';
-                    canvas.style.height = '100%';
-                } else {
-                    canvas.style.width = '100%';
-                    canvas.style.height = 'auto';
-                }
+            let maxWidth = 0;
+            let maxHeight = 0;
+            
+            // Determine maximum width and height needed
+            for (const canvas of canvases) {
+                maxWidth = Math.max(maxWidth, canvas.width);
+                maxHeight = Math.max(maxHeight, canvas.height);
             }
+
+            // Adjust canvas container size
+            const container = document.querySelector('.canvas-container');
+            container.style.width = `${maxWidth}px`;
+            container.style.height = `${maxHeight}px`;
         }
 
         function updateAlpha() {
@@ -197,7 +179,7 @@
             const tempCanvas = document.createElement('canvas');
             const tempContext = tempCanvas.getContext('2d');
 
-            // Set the canvas size
+            // Calculate dimensions for the temporary canvas
             const container = document.querySelector('.canvas-container');
             const containerWidth = container.clientWidth;
             const containerHeight = container.clientHeight;
@@ -206,7 +188,7 @@
 
             // Draw the canvases onto the temporary canvas
             for (const canvas of canvases) {
-                tempContext.drawImage(canvas, 0, 0, canvas.width, canvas.height);
+                tempContext.drawImage(canvas, 0, 0);
             }
 
             // Convert the temporary canvas to PNG
