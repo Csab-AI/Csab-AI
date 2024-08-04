@@ -35,6 +35,7 @@
             left: 0;
         }
         .button-group {
+            margin-top: 10px;
             display: flex;
             flex-direction: column;
         }
@@ -42,7 +43,9 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF Összehasonlító2</h1>
+        <div>
+            <h1>PDF sszehasonlító</h1>
+        </div>
         <div>
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
@@ -111,7 +114,7 @@
                 const page = await pdf.getPage(pageNumber);
 
                 const viewport = page.getViewport({scale: 1});
-                
+
                 // Set canvas dimensions to original PDF size
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
@@ -126,10 +129,6 @@
                     viewport: viewport
                 };
                 await page.render(renderContext).promise;
-
-                // Ensure the canvas stays the same size as the PDF page
-                canvas.style.width = `${viewport.width}px`;
-                canvas.style.height = `${viewport.height}px`;
             };
             reader.readAsArrayBuffer(file);
         }
@@ -139,19 +138,25 @@
             const canvas1 = document.getElementById('canvas1');
             const canvas2 = document.getElementById('canvas2');
 
-            const maxWidth = Math.max(canvas1.width, canvas2.width);
-            const maxHeight = Math.max(canvas1.height, canvas2.height);
-
-            container.style.width = `${maxWidth}px`;
-            container.style.height = `${maxHeight}px`;
-
             // Set the dimensions of the container
-            container.style.width = `${maxWidth}px`;
-            container.style.height = `${maxHeight}px`;
+            container.style.width = '100%';
+            container.style.height = '100%';
 
-            // Ensure the container can be scrolled if needed
-            container.scrollLeft = 0;
-            container.scrollTop = 0;
+            // Scale canvases to fit the container while maintaining aspect ratio
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+
+            const scaleX = containerWidth / maxWidth;
+            const scaleY = containerHeight / maxHeight;
+            const scale = Math.min(scaleX, scaleY);
+
+            const newWidth = maxWidth * scale;
+            const newHeight = maxHeight * scale;
+
+            canvas1.style.width = `${newWidth}px`;
+            canvas1.style.height = `${newHeight}px`;
+            canvas2.style.width = `${newWidth}px`;
+            canvas2.style.height = `${newHeight}px`;
         }
 
         function updateAlpha() {
