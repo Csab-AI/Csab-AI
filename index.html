@@ -33,7 +33,7 @@
 </head>
 <body>
     <div class="menu">
-        <h2>PDF Összehasonlító1</h2>
+        <h1>PDF Összehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -95,12 +95,10 @@
                 const pdfData = new Uint8Array(reader.result);
                 const loadingTask = pdfjsLib.getDocument({data: pdfData});
                 const pdf = await loadingTask.promise;
-                console.log('PDF betöltve:', pdf);
                 const pageNumber = 1;
                 const page = await pdf.getPage(pageNumber);
-                console.log('Oldal:', page);
-                const viewport = page.getViewport({scale: 1});
 
+                const viewport = page.getViewport({scale: 1});
                 const context = canvas.getContext('2d');
                 const container = document.querySelector('.canvas-container');
                 
@@ -114,7 +112,7 @@
                 const scale = Math.min(scaleX, scaleY);
 
                 const scaledViewport = page.getViewport({scale: scale});
-                
+
                 // Set canvas dimensions
                 canvas.width = scaledViewport.width;
                 canvas.height = scaledViewport.height;
@@ -124,7 +122,6 @@
                     viewport: scaledViewport
                 };
                 await page.render(renderContext).promise;
-                console.log('Oldal renderelve');
                 
                 // Update canvas size for responsive layout
                 updateCanvasSize(canvas, containerWidth, containerHeight, viewport.width, viewport.height);
@@ -201,22 +198,31 @@
             const canvases = document.getElementsByTagName('canvas');
             if (canvases.length === 0) return;
 
-            // Create an image from each canvas
-            const canvas1 = document.getElementById('canvas1');
-            const canvas2 = document.getElementById('canvas2');
-            const img1 = canvas1.toDataURL('image/png');
-            const img2 = canvas2.toDataURL('image/png');
+            // Create a temporary canvas to combine the views
+            const tempCanvas = document.createElement('canvas');
+            const tempContext = tempCanvas.getContext('2d');
+
+            // Set the canvas size
+            const container = document.querySelector('.canvas-container');
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            tempCanvas.width = containerWidth;
+            tempCanvas.height = containerHeight;
+
+            // Draw the canvases onto the temporary canvas
+            for (const canvas of canvases) {
+                tempContext.drawImage(canvas, 0, 0, containerWidth, containerHeight);
+            }
+
+            // Convert the temporary canvas to PNG
+            const imgData = tempCanvas.toDataURL('image/png');
 
             // Create PDF
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('p', 'pt', 'a4');
 
-            // Add first image
-            pdf.addImage(img1, 'PNG', 10, 10, 190, 277); // Adjust size and position if needed
-
-            // Add second page for the second image
-            pdf.addPage();
-            pdf.addImage(img2, 'PNG', 10, 10, 190, 277); // Adjust size and position if needed
+            // Add the combined image
+            pdf.addImage(imgData, 'PNG', 10, 10, 190, 277);
 
             // Add file names
             pdf.setFontSize(12);
