@@ -28,11 +28,12 @@
             position: relative;
             overflow: auto;
             background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
+            position: relative;
         }
         .button-group {
             margin-top: 10px;
@@ -44,7 +45,7 @@
 <body>
     <div class="menu">
         <div>
-            <h1>PDF sszehasonlító</h1>
+            <h1>PDF Összehasonlító</h1>
         </div>
         <div>
             <input type="file" id="file1" accept="application/pdf">
@@ -142,21 +143,11 @@
             container.style.width = '100%';
             container.style.height = '100%';
 
-            // Scale canvases to fit the container while maintaining aspect ratio
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-
-            const scaleX = containerWidth / maxWidth;
-            const scaleY = containerHeight / maxHeight;
-            const scale = Math.min(scaleX, scaleY);
-
-            const newWidth = maxWidth * scale;
-            const newHeight = maxHeight * scale;
-
-            canvas1.style.width = `${newWidth}px`;
-            canvas1.style.height = `${newHeight}px`;
-            canvas2.style.width = `${newWidth}px`;
-            canvas2.style.height = `${newHeight}px`;
+            // Ensure canvases maintain aspect ratio and fill the container
+            canvas1.style.width = `${maxWidth}px`;
+            canvas1.style.height = `${maxHeight}px`;
+            canvas2.style.width = `${maxWidth}px`;
+            canvas2.style.height = `${maxHeight}px`;
         }
 
         function updateAlpha() {
