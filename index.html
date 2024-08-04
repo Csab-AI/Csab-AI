@@ -29,7 +29,6 @@
             position: absolute;
             top: 0;
             left: 0;
-            cursor: grab;
         }
         .button-group {
             margin-top: 10px;
@@ -38,7 +37,7 @@
 </head>
 <body>
     <div class="menu">
-        <h1>PDF sszehasonlító</h1>
+        <h1>PDF Összehasonlító</h1>
         <input type="file" id="file1" accept="application/pdf">
         <input type="file" id="file2" accept="application/pdf">
         <button onclick="comparePDFs()">Összehasonlítás</button>
@@ -128,6 +127,10 @@
 
             container.style.width = `${maxWidth}px`;
             container.style.height = `${maxHeight}px`;
+
+            // Ensure the container can be scrolled if needed
+            container.scrollLeft = 0;
+            container.scrollTop = 0;
         }
 
         function updateAlpha() {
