@@ -42,7 +42,7 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
+            <h2>Rajzoló Menü1</h2>
             <button onclick="startDrawing('line')">Vonal Rajzolása</button>
             <button onclick="startDrawing('circle')">Kör Rajzolása</button>
             <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
@@ -57,6 +57,7 @@
             <button onclick="stopBlinking()">Villogtatás Leállítása</button>
             <button onclick="resetView()">Eredeti nézet visszaállítása</button>
             <button onclick="saveAsPDF()">Mentés PDF-be</button>
+            <button onclick="deleteSelected()">Kijelölt Törlése</button>
         </div>
         <div id="canvasContainer">
             <canvas id="canvas1"></canvas>
@@ -79,6 +80,8 @@
         let color = '#000000';
         let file1Name = '';
         let file2Name = '';
+        let objects = []; // Objektumok tárolása
+        let selectedObject = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             drawingCanvas = document.getElementById('drawingCanvas');
@@ -86,6 +89,12 @@
             document.getElementById('colorPicker').addEventListener('input', (e) => {
                 color = e.target.value;
             });
+
+            drawingCanvas.addEventListener('mousedown', onMouseDown);
+            drawingCanvas.addEventListener('mousemove', onMouseMove);
+            drawingCanvas.addEventListener('mouseup', onMouseUp);
+            document.getElementById('alphaSlider').addEventListener('input', updateAlpha);
+            window.addEventListener('resize', fitCanvasesToContainer);
         });
 
         async function comparePDFs() {
@@ -109,10 +118,8 @@
                 const pdfData = new Uint8Array(reader.result);
                 const loadingTask = pdfjsLib.getDocument({data: pdfData});
                 const pdf = await loadingTask.promise;
-                console.log('PDF betöltve:', pdf);
                 const pageNumber = 1;
                 const page = await pdf.getPage(pageNumber);
-                console.log('Oldal:', page);
                 const viewport = page.getViewport({scale: 1});
 
                 const canvas = document.getElementById(canvasId);
@@ -132,7 +139,6 @@
                     viewport: scaledViewport
                 };
                 await page.render(renderContext).promise;
-                console.log('Oldal renderelve');
 
                 // Update drawing canvas size
                 drawingCanvas.width = canvas.width;
@@ -154,8 +160,6 @@
             const canvas2 = document.getElementById('canvas2');
             canvas2.style.opacity = alpha;
         }
-
-        document.getElementById('alphaSlider').addEventListener('input', updateAlpha);
 
         function startBlinking() {
             blinking = true;
@@ -184,64 +188,126 @@
         function startDrawing(type) {
             drawType = type;
             drawing = true;
-            document.getElementById('canvasContainer').style.cursor = 'crosshair';
         }
 
-        function stopDrawing() {
-            drawing = false;
-            drawType = '';
-            document.getElementById('canvasContainer').style.cursor = 'default';
-        }
-
-        function draw(e) {
-            if (!drawing) return;
-
-            const rect = drawingCanvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / scale;
-            const y = (e.clientY - rect.top) / scale;
-
-            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
-
-            drawingContext.strokeStyle = color;
-            drawingContext.fillStyle = color;
-
-            if (drawType === 'line') {
-                drawingContext.beginPath();
-                drawingContext.moveTo(startX, startY);
-                drawingContext.lineTo(x, y);
-                drawingContext.stroke();
-            } else if (drawType === 'circle') {
-                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
-                drawingContext.beginPath();
-                drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
-                drawingContext.stroke();
-            } else if (drawType === 'text') {
-                const text = document.getElementById('textInput').value;
-                drawingContext.textAlign = "center";
-                drawingContext.textBaseline = "middle";
-                drawingContext.fillText(text, x, y);
-                saveDrawing();
-                stopDrawing();
-                return;
+        function onMouseDown(e) {
+            if (drawing) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                startX = (e.clientX - rect.left);
+                startY = (e.clientY - rect.top);
+            } else {
+                selectObject(e);
             }
         }
 
-        function saveDrawing() {
-            const mainCanvas1 = document.getElementById('canvas1');
-            const mainCanvas2 = document.getElementById('canvas2');
-            const context1 = mainCanvas1.getContext('2d');
-            const context2 = mainCanvas2.getContext('2d');
-            context1.drawImage(drawingCanvas, 0, 0);
-            context2.drawImage(drawingCanvas, 0, 0);
-            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+        function onMouseMove(e) {
+            if (drawing) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawAllObjects(); // Redraw all objects to avoid overlap
+                drawingContext.strokeStyle = color;
+                drawingContext.fillStyle = color;
+                if (drawType === 'line') {
+                    drawingContext.beginPath();
+                    drawingContext.moveTo(startX, startY);
+                    drawingContext.lineTo(x, y);
+                    drawingContext.stroke();
+                } else if (drawType === 'circle') {
+                    const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                    drawingContext.beginPath();
+                    drawingContext.arc(startX, startY, radius, 0, Math.PI * 2);
+                    drawingContext.stroke();
+                }
+            }
+        }
 
-            stopDrawing();
+        function onMouseUp(e) {
+            if (drawing) {
+                const rect = drawingCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                if (drawType === 'line') {
+                    const line = { type: 'line', startX, startY, endX: x, endY: y, color };
+                    objects.push(line);
+                } else if (drawType === 'circle') {
+                    const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                    const circle = { type: 'circle', startX, startY, radius, color };
+                    objects.push(circle);
+                } else if (drawType === 'text') {
+                    const text = document.getElementById('textInput').value;
+                    const textObj = { type: 'text', x: startX, y: startY, text, color };
+                    objects.push(textObj);
+                }
+                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawAllObjects();
+                drawing = false;
+            }
+        }
+
+        function drawAllObjects() {
+            objects.forEach(obj => {
+                if (obj.type === 'line') {
+                    drawingContext.strokeStyle = obj.color;
+                    drawingContext.beginPath();
+                    drawingContext.moveTo(obj.startX, obj.startY);
+                    drawingContext.lineTo(obj.endX, obj.endY);
+                    drawingContext.stroke();
+                } else if (obj.type === 'circle') {
+                    drawingContext.strokeStyle = obj.color;
+                    drawingContext.beginPath();
+                    drawingContext.arc(obj.startX, obj.startY, obj.radius, 0, Math.PI * 2);
+                    drawingContext.stroke();
+                } else if (obj.type === 'text') {
+                    drawingContext.fillStyle = obj.color;
+                    drawingContext.textAlign = "center";
+                    drawingContext.textBaseline = "middle";
+                    drawingContext.fillText(obj.text, obj.x, obj.y);
+                }
+            });
+        }
+
+        function selectObject(e) {
+            const rect = drawingCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            selectedObject = objects.find(obj => isPointOnObject(x, y, obj));
+            if (selectedObject) {
+                console.log('Object selected:', selectedObject);
+            } else {
+                console.log('No object selected');
+            }
+        }
+
+        function isPointOnObject(x, y, obj) {
+            const tolerance = 5; // Pontosság
+            if (obj.type === 'line') {
+                const distance = Math.abs((obj.endY - obj.startY) * x - (obj.endX - obj.startX) * y + obj.endX * obj.startY - obj.endY * obj.startX) /
+                    Math.sqrt(Math.pow(obj.endY - obj.startY, 2) + Math.pow(obj.endX - obj.startX, 2));
+                return distance < tolerance;
+            } else if (obj.type === 'circle') {
+                const distance = Math.sqrt(Math.pow(x - obj.startX, 2) + Math.pow(y - obj.startY, 2));
+                return Math.abs(distance - obj.radius) < tolerance;
+            } else if (obj.type === 'text') {
+                const textWidth = drawingContext.measureText(obj.text).width;
+                return x >= obj.x - textWidth / 2 && x <= obj.x + textWidth / 2 && y >= obj.y - 10 && y <= obj.y + 10;
+            }
+        }
+
+        function deleteSelected() {
+            if (selectedObject) {
+                objects = objects.filter(obj => obj !== selectedObject);
+                selectedObject = null;
+                drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+                drawAllObjects();
+            }
         }
 
         async function saveAsPDF() {
             const { jsPDF } = window.jspdf;
             const container = document.getElementById('canvasContainer');
-            
+
             html2canvas(container, {
                 scale: 2,
                 useCORS: true
@@ -254,17 +320,15 @@
 
                 const imgData = canvas.toDataURL('image/png');
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                
+
                 // Adding the file names to the PDF
                 pdf.setFontSize(10);
-                pdf.text(File 1: ${file1Name}, 10, pdf.internal.pageSize.height - 20);
-                pdf.text(File 2: ${file2Name}, 10, pdf.internal.pageSize.height - 10);
+                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
+                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
 
                 pdf.save('current_view.pdf');
             });
         }
-
-        window.addEventListener('resize', fitCanvasesToContainer);
 
         // Zoom and Pan functionality
         let isDragging = false;
@@ -275,11 +339,11 @@
         container.addEventListener('mousedown', (e) => {
             if (drawing) {
                 const rect = e.target.getBoundingClientRect();
-                startX = (e.clientX - rect.left) / scale;
-                startY = (e.clientY - rect.top) / scale;
-                document.addEventListener('mousemove', draw);
+                startX = (e.clientX - rect.left);
+                startY = (e.clientY - rect.top);
+                document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', () => {
-                    document.removeEventListener('mousemove', draw);
+                    document.removeEventListener('mousemove', onMouseMove);
                     if (drawType !== 'text') {
                         saveDrawing();
                     }
@@ -317,7 +381,7 @@
         function updateTransform() {
             const canvases = document.getElementsByTagName('canvas');
             for (let canvas of canvases) {
-                canvas.style.transform = translate(${offsetX}px, ${offsetY}px) scale(${scale});
+                canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
             }
         }
     </script>
