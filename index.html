@@ -273,9 +273,9 @@
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
                 
                 // Adding the file names to the PDF
-                pdf.setFontSize(10);
-                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 20);
-                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 10);
+                pdf.setFontSize(14); // Increase the font size by 4 points
+                pdf.text(`File 1: ${file1Name}`, 10, pdf.internal.pageSize.height - 30);
+                pdf.text(`File 2: ${file2Name}`, 10, pdf.internal.pageSize.height - 15);
 
                 pdf.save('current_view.pdf');
             });
