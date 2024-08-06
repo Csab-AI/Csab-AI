@@ -45,9 +45,6 @@
         .section h2 {
             margin-top: 0;
         }
-        .menu input[type="file"]::file-selector-button {
-            content: 'Select File';
-        }
     </style>
 </head>
 <body>
@@ -55,7 +52,9 @@
         <div class="menu">
             <div class="section">
                 <h2>Comparison</h2>
+                <label for="file1">Select File 1:</label>
                 <input type="file" id="file1" accept="application/pdf">
+                <label for="file2">Select File 2:</label>
                 <input type="file" id="file2" accept="application/pdf">
                 <button onclick="comparePDFs()">Compare PDFs</button>
                 <label>Opacity:</label>
