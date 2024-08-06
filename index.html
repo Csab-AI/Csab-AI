@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Összehasonlító és Rajzoló</title>
+    <title>PDF Comparator and Drawer - Created by: Csaba Darabos - darabos.csaba@gmail.com</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -42,21 +42,21 @@
 <body>
     <div class="container">
         <div class="menu">
-            <h2>Rajzoló Menü</h2>
-            <button onclick="startDrawing('line')">Vonal Rajzolása</button>
-            <button onclick="startDrawing('circle')">Kör Rajzolása</button>
-            <button onclick="startDrawing('text')">Felirat Elhelyezése</button>
+            <h2>Drawing Menu</h2>
+            <button onclick="startDrawing('line')">Draw Line</button>
+            <button onclick="startDrawing('circle')">Draw Circle</button>
+            <button onclick="startDrawing('text')">Place Text</button>
             <input type="color" id="colorPicker" value="#000000">
-            <input type="text" id="textInput" placeholder="Felirat szövege">
+            <input type="text" id="textInput" placeholder="Text content">
             <input type="file" id="file1" accept="application/pdf">
             <input type="file" id="file2" accept="application/pdf">
-            <button onclick="comparePDFs()">Összehasonlítás</button>
-            <label>Átlátszóság:</label>
+            <button onclick="comparePDFs()">Compare PDFs</button>
+            <label>Opacity:</label>
             <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
-            <button onclick="startBlinking()">Villogtatás</button>
-            <button onclick="stopBlinking()">Villogtatás Leállítása</button>
-            <button onclick="resetView()">Eredeti nézet visszaállítása</button>
-            <button onclick="saveAsPDF()">Mentés PDF-be</button>
+            <button onclick="startBlinking()">Start Blinking</button>
+            <button onclick="stopBlinking()">Stop Blinking</button>
+            <button onclick="resetView()">Reset View</button>
+            <button onclick="saveAsPDF()">Save as PDF</button>
         </div>
         <div id="canvasContainer">
             <canvas id="canvas1"></canvas>
@@ -100,7 +100,7 @@
                 fitCanvasesToContainer();
                 resetView();
             } else {
-                alert('Kérjük, válassza ki mindkét PDF fájlt.');
+                alert('Please select both PDF files.');
             }
         }
 
