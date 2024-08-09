@@ -59,6 +59,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-alpha1/html2canvas.min.js"></script>
     <script>
         let drawingCanvas, drawingContext;
         let filePairs = [];
@@ -80,8 +81,8 @@
                     const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
 
                     filePairs = rows.slice(1).map(row => ({
-                        file1: row[0],
-                        file2: row[1]
+                        file1: row[0]?.replace(/\\/g, '\\\\'), // Cseréld a backslash-eket
+                        file2: row[1]?.replace(/\\/g, '\\\\')
                     }));
 
                     compareNextPair();
@@ -114,30 +115,37 @@
         }
 
         async function displayPDF(filePath, canvasId) {
-            const pdf = await pdfjsLib.getDocument(filePath).promise;
-            const pageNumber = 1;
-            const page = await pdf.getPage(pageNumber);
-            const viewport = page.getViewport({scale: 1});
+            try {
+                const pdf = await pdfjsLib.getDocument(filePath).promise;
+                const pageNumber = 1;
+                const page = await pdf.getPage(pageNumber);
+                const viewport = page.getViewport({scale: 1});
 
-            const canvas = document.getElementById(canvasId);
-            const context = canvas.getContext('2d');
-            const scaleX = canvas.width / viewport.width;
-            const scaleY = canvas.height / viewport.height;
-            const scale = Math.min(scaleX, scaleY);
-            const scaledViewport = page.getViewport({scale: scale});
+                const canvas = document.getElementById(canvasId);
+                const context = canvas.getContext('2d');
+                const scaleX = canvas.width / viewport.width;
+                const scaleY = canvas.height / viewport.height;
+                const scale = Math.min(scaleX, scaleY);
+                const scaledViewport = page.getViewport({scale: scale});
 
-            canvas.width = scaledViewport.width;
-            canvas.height = scaledViewport.height;
+                canvas.width = scaledViewport.width;
+                canvas.height = scaledViewport.height;
 
-            const renderContext = {
-                canvasContext: context,
-                viewport: scaledViewport
-            };
-            await page.render(renderContext).promise;
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: scaledViewport
+                };
+                await page.render(renderContext).promise;
 
-            // Update drawing canvas size
-            drawingCanvas.width = canvas.width;
-            drawingCanvas.height = canvas.height;
+                // Frissítsd a rajzoló vászon méretét
+                drawingCanvas.width = canvas.width;
+                drawingCanvas.height = canvas.height;
+
+                console.log(`Successfully loaded PDF: ${filePath}`);
+            } catch (error) {
+                console.error(`Failed to load PDF: ${filePath}. Error: ${error}`);
+                alert(`Failed to load PDF: ${filePath}`);
+            }
         }
 
         async function saveComparisonAsPDF(file1Path, file2Path) {
