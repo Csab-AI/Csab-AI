@@ -43,7 +43,7 @@
     <div class="container">
         <div class="menu">
             <div class="section">
-                <h2>Load and Compare PDFs2</h2>
+                <h2>Load and Compare PDFs</h2>
                 <label for="excelFile">Select Excel File:</label>
                 <input type="file" id="excelFile" accept=".xlsx">
                 <button onclick="loadAndComparePDFs()">Load and Compare PDFs</button>
@@ -106,7 +106,7 @@
             try {
                 await displayPDF(file1, 'canvas1');
                 await displayPDF(file2, 'canvas2');
-                saveComparisonAsPDF(file1, file2);
+                await saveComparisonAsPDF(file1, file2);
             } catch (error) {
                 console.error('Error comparing files:', error);
             }
@@ -123,8 +123,8 @@
 
                 const canvas = document.getElementById(canvasId);
                 const context = canvas.getContext('2d');
-                const scaleX = canvas.width / viewport.width;
-                const scaleY = canvas.height / viewport.height;
+                const scaleX = viewport.width / canvas.clientWidth;
+                const scaleY = viewport.height / canvas.clientHeight;
                 const scale = Math.min(scaleX, scaleY);
                 const scaledViewport = page.getViewport({scale: scale});
 
@@ -152,10 +152,12 @@
             const { jsPDF } = window.jspdf;
             const container = document.getElementById('canvasContainer');
             
-            html2canvas(container, {
-                scale: 2,
-                useCORS: true
-            }).then(canvas => {
+            try {
+                const canvas = await html2canvas(container, {
+                    scale: 2,
+                    useCORS: true
+                });
+
                 const pdf = new jsPDF({
                     orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
                     unit: 'px',
@@ -172,7 +174,12 @@
 
                 const fileName = `comparison_${getFileName(file1Path)}_vs_${getFileName(file2Path)}.pdf`;
                 pdf.save(fileName);
-            });
+
+                console.log(`Successfully saved comparison PDF: ${fileName}`);
+            } catch (error) {
+                console.error('Error saving PDF:', error);
+                alert(`Error saving PDF: ${error}`);
+            }
         }
 
         function getFileName(filePath) {
