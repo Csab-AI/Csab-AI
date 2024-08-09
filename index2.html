@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Comparator and Drawer - Multi PDF Comparison</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+        .menu {
+            display: flex;
+            flex-direction: column;
+            width: 300px;
+            padding: 10px;
+            box-sizing: border-box;
+            border-right: 1px solid #000;
+        }
+        .menu button, .menu input {
+            margin-bottom: 10px;
+        }
+        #canvasContainer {
+            position: relative;
+            flex-grow: 1;
+            border: 1px solid #000;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="menu">
+            <div class="section">
+                <h2>Load and Compare PDFs</h2>
+                <label for="excelFile">Select Excel File:</label>
+                <input type="file" id="excelFile" accept=".xlsx">
+                <button onclick="loadAndComparePDFs()">Load and Compare PDFs</button>
+            </div>
+        </div>
+        <div id="canvasContainer">
+            <canvas id="canvas1"></canvas>
+            <canvas id="canvas2"></canvas>
+            <canvas id="drawingCanvas"></canvas>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.9.359/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        let drawingCanvas, drawingContext;
+        let filePairs = [];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            drawingCanvas = document.getElementById('drawingCanvas');
+            drawingContext = drawingCanvas.getContext('2d');
+        });
+
+        function loadAndComparePDFs() {
+            const excelFile = document.getElementById('excelFile').files[0];
+            if (excelFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+
+                    filePairs = rows.slice(1).map(row => ({
+                        file1: row[0],
+                        file2: row[1]
+                    }));
+
+                    compareNextPair();
+                };
+                reader.readAsArrayBuffer(excelFile);
+            } else {
+                alert('Please select an Excel file.');
+            }
+        }
+
+        async function compareNextPair() {
+            if (filePairs.length === 0) {
+                alert('Comparison completed.');
+                return;
+            }
+
+            const pair = filePairs.shift();
+            const file1 = pair.file1;
+            const file2 = pair.file2;
+
+            try {
+                await displayPDF(file1, 'canvas1');
+                await displayPDF(file2, 'canvas2');
+                saveComparisonAsPDF(file1, file2);
+            } catch (error) {
+                console.error('Error comparing files:', error);
+            }
+
+            compareNextPair();
+        }
+
+        async function displayPDF(filePath, canvasId) {
+            const pdf = await pdfjsLib.getDocument(filePath).promise;
+            const pageNumber = 1;
+            const page = await pdf.getPage(pageNumber);
+            const viewport = page.getViewport({scale: 1});
+
+            const canvas = document.getElementById(canvasId);
+            const context = canvas.getContext('2d');
+            const scaleX = canvas.width / viewport.width;
+            const scaleY = canvas.height / viewport.height;
+            const scale = Math.min(scaleX, scaleY);
+            const scaledViewport = page.getViewport({scale: scale});
+
+            canvas.width = scaledViewport.width;
+            canvas.height = scaledViewport.height;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: scaledViewport
+            };
+            await page.render(renderContext).promise;
+
+            // Update drawing canvas size
+            drawingCanvas.width = canvas.width;
+            drawingCanvas.height = canvas.height;
+        }
+
+        async function saveComparisonAsPDF(file1Path, file2Path) {
+            const { jsPDF } = window.jspdf;
+            const container = document.getElementById('canvasContainer');
+            
+            html2canvas(container, {
+                scale: 2,
+                useCORS: true
+            }).then(canvas => {
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+
+                // Adding the file names to the PDF
+                pdf.setFontSize(14); 
+                pdf.text(`File 1: ${file1Path}`, 10, pdf.internal.pageSize.height - 30);
+                pdf.text(`File 2: ${file2Path}`, 10, pdf.internal.pageSize.height - 15);
+
+                const fileName = `comparison_${getFileName(file1Path)}_vs_${getFileName(file2Path)}.pdf`;
+                pdf.save(fileName);
+            });
+        }
+
+        function getFileName(filePath) {
+            return filePath.split('/').pop().split('.').shift();
+        }
+    </script>
+</body>
+</html>
