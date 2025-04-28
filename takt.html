@@ -3,21 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>Lean Takt Ütemező – Shareable State</title>
+  <title>Lean Takt Ütemező – Kollaboráció & Duplikálás</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Yjs + WebRTC -->
+  <script src="https://cdn.jsdelivr.net/npm/yjs@13.5.10/dist/yjs.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/y-webrtc@10.1.1/dist/y-webrtc.umd.js"></script>
   <!-- PDF export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
-          crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
-          crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
   <style>
     .timeline-wrapper { position:relative; width:100%; height:400px; overflow:auto; border:1px solid #ddd; background:#fff }
     .takt-display     { font-size:14px; font-weight:500; margin-bottom:8px }
-    .axis             { position:sticky; top:0; z-index:10; height:40px; background:#f9fafb }
-    .axis .label      { position:absolute; top:0; width:calc(100%/7); text-align:center; font-size:12px; color:#555 }
+    .axis             { position:sticky; top:0; z-index:10; display:flex; }
+    .axis .label      { flex:0 0 auto; width:calc(100%/61); text-align:center; font-size:12px; color:#555; padding-top:4px; }
     .axis .sunday     { background:#e5e7eb }
-    .milestone        { position:absolute; top:0; width:2px; height:calc(100% - 40px); background:#ff5722 }
+    .milestone        { position:absolute; top:0; width:2px; height:100%; background:#ff5722 }
     .milestone .label { position:absolute; top:0; left:4px; font-size:10px; color:#ff5722 }
     .lane             { position:relative; border-top:1px solid #e5e7eb; margin-bottom:6px }
     .lane:nth-child(odd) { background:#f3f4f6 }
@@ -28,10 +29,15 @@
                         overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:grab;
                         box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:transform .2s,box-shadow .2s }
     .task:hover       { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.2) }
+    #contextMenu      { position:absolute; background:#fff; border:1px solid #ccc; box-shadow:0 2px 6px rgba(0,0,0,0.2);
+                        display:none; z-index:1000 }
+    #contextMenu ul   { list-style:none; margin:0; padding:4px 0 }
+    #contextMenu li   { padding:6px 12px; cursor:pointer }
+    #contextMenu li:hover { background:#f3f4f6 }
     #editModal        { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
                         align-items:center; justify-content:center; z-index:50 }
     #editModal .modal-content { background:#fff; padding:20px; border-radius:8px; width:360px;
-                                box-shadow:0 2px 10px rgba(0,0,0,0.2); }
+                                box-shadow:0 2px 10px rgba(0,0,0,0.2) }
   </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -47,9 +53,7 @@
         </button>
       </div>
     </div>
-
     <div id="taktDisplay" class="takt-display"></div>
-
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
       <aside class="bg-white shadow rounded p-4 space-y-4">
         <h2 class="text-xl font-semibold">Beállítások</h2>
@@ -60,7 +64,6 @@
           <input type="color" id="zoneColor" value="#4f46e5" class="w-full mb-2 h-8 p-0">
           <button id="addZone" class="w-full bg-blue-600 text-white py-1 rounded">Zóna hozzáadása</button>
         </div>
-
         <!-- Feladat hozzáadása -->
         <div>
           <h3 class="font-semibold mb-1">Feladat hozzáadása</h3>
@@ -83,11 +86,20 @@
           <button id="addTask" class="w-full bg-indigo-600 text-white py-1 rounded">Feladat hozzáadása</button>
         </div>
       </aside>
-
       <main class="lg:col-span-3">
-        <div id="timelineContainer" class="timeline-wrapper"></div>
+        <div id="timelineContainer" class="timeline-wrapper">
+          <div id="axis" class="axis"></div>
+        </div>
       </main>
     </div>
+  </div>
+
+  <!-- Kontextus menü -->
+  <div id="contextMenu">
+    <ul>
+      <li id="ctxEdit">Szerkesztés</li>
+      <li id="ctxDuplicate">Duplikálás</li>
+    </ul>
   </div>
 
   <!-- Edit Modal -->
@@ -120,116 +132,117 @@
 
   <script>
   (function(){
-    const zones      = [];
-    const tasks      = [];
-    let currentEdit  = null;
+    // 1) Yjs + WebRTC
+    const ydoc = new Y.Doc();
+    const params = new URLSearchParams(location.search);
+    let room = params.get('room');
+    if(!room){
+      room = crypto.randomUUID().slice(0,8);
+      params.set('room', room);
+      history.replaceState(null, '', location.pathname + '?' + params);
+    }
+    new Y.WebrtcProvider(room, ydoc, { signaling:['wss://signaling.yjs.dev'] });
 
-    const domainStart= new Date('2025-05-05T00:00:00').getTime();
-    const domainEnd  = domainStart + 7*24*3600*1000;
+    const zonesY = ydoc.getArray('zones'),
+          tasksY = ydoc.getArray('tasks'),
+          milY   = ydoc.getArray('milestones');
 
-    // DOM
-    const zoneNameIn    = document.getElementById('zoneName'),
-          zoneColorIn   = document.getElementById('zoneColor'),
-          addZoneBtn    = document.getElementById('addZone'),
-          taskColorIn   = document.getElementById('taskColor'),
-          taskZoneSel   = document.getElementById('taskZone'),
-          taskNameIn    = document.getElementById('taskName'),
-          taskStartIn   = document.getElementById('taskStart'),
-          taskEndIn     = document.getElementById('taskEnd'),
-          taskContractor= document.getElementById('taskContractor'),
-          taskWorkforce = document.getElementById('taskWorkforce'),
-          taskEquipment = document.getElementById('taskEquipment'),
-          addTaskBtn    = document.getElementById('addTask'),
-          shareLinkBtn  = document.getElementById('shareLink'),
-          exportPdfBtn  = document.getElementById('exportPdf'),
-          timelineEl    = document.getElementById('timelineContainer'),
-          taktDisplay   = document.getElementById('taktDisplay'),
-          editModal     = document.getElementById('editModal'),
-          editName      = document.getElementById('editName'),
-          editColor     = document.getElementById('editColor'),
-          editZone      = document.getElementById('editZone'),
-          editContractor= document.getElementById('editContractor'),
-          editDetails   = document.getElementById('editContractorDetails'),
-          editWorkforce = document.getElementById('editWorkforce'),
-          editEquipment = document.getElementById('editEquipment'),
-          editStart     = document.getElementById('editStart'),
-          editEnd       = document.getElementById('editEnd'),
-          cancelEdit    = document.getElementById('cancelEdit'),
-          saveEdit      = document.getElementById('saveEdit');
-
-    // Load state from URL?
-    function loadState(){
-      const p = new URLSearchParams(location.search), s = p.get('state');
-      if(!s) return;
-      try{
-        const obj = JSON.parse(atob(s));
-        zones.splice(0,zones.length,...obj.zones);
-        tasks.splice(0,tasks.length,...obj.tasks.map(t=>{
-          t.start=new Date(t.start); t.end=new Date(t.end);
-          return t;
-        }));
-      }catch(e){ console.warn('Hibás state param'); }
+    // seed initial zone
+    if(zonesY.length===0){
+      zonesY.push([{id:1,name:'Zóna 1',color:'#4f46e5'}]);
     }
 
-    // Save state to URL & clipboard
-    shareLinkBtn.onclick = ()=>{
-      const state = { zones, tasks };
-      const encoded = btoa(JSON.stringify({
-        zones,
-        tasks: tasks.map(t=>({
-          ...t,
-          start:t.start.toISOString(),
-          end:  t.end.toISOString()
-        }))
-      }));
-      const url = location.origin+location.pathname+'?state='+encoded;
-      navigator.clipboard.writeText(url)
-        .then(()=>alert('Link másolva a vágólapra'));
-    };
+    // 2) DOM refs
+    const zoneNameIn     = document.getElementById('zoneName'),
+          zoneColorIn    = document.getElementById('zoneColor'),
+          addZoneBtn     = document.getElementById('addZone'),
+          taskColorIn    = document.getElementById('taskColor'),
+          taskZoneSel    = document.getElementById('taskZone'),
+          taskNameIn     = document.getElementById('taskName'),
+          taskStartIn    = document.getElementById('taskStart'),
+          taskEndIn      = document.getElementById('taskEnd'),
+          taskContractor = document.getElementById('taskContractor'),
+          taskWorkforce  = document.getElementById('taskWorkforce'),
+          taskEquipment  = document.getElementById('taskEquipment'),
+          addTaskBtn     = document.getElementById('addTask'),
+          shareLinkBtn   = document.getElementById('shareLink'),
+          exportPdfBtn   = document.getElementById('exportPdf'),
+          timelineEl     = document.getElementById('timelineContainer'),
+          axisEl         = document.getElementById('axis'),
+          taktDisplay    = document.getElementById('taktDisplay'),
+          contextMenu    = document.getElementById('contextMenu'),
+          ctxEdit        = document.getElementById('ctxEdit'),
+          ctxDuplicate   = document.getElementById('ctxDuplicate'),
+          editModal      = document.getElementById('editModal'),
+          editName       = document.getElementById('editName'),
+          editColor      = document.getElementById('editColor'),
+          editZone       = document.getElementById('editZone'),
+          editContractor = document.getElementById('editContractor'),
+          editDetails    = document.getElementById('editContractorDetails'),
+          editWorkforce  = document.getElementById('editWorkforce'),
+          editEquipment  = document.getElementById('editEquipment'),
+          editStart      = document.getElementById('editStart'),
+          editEnd        = document.getElementById('editEnd'),
+          cancelEdit     = document.getElementById('cancelEdit'),
+          saveEdit       = document.getElementById('saveEdit');
 
-    // Refresh selectors
+    // timeline span: 2025-05-05 to +2 months
+    const startDate = new Date('2025-05-05'),
+          endDate   = new Date(startDate);
+    endDate.setMonth(endDate.getMonth()+2);
+    const domainStart = startDate.getTime(),
+          domainEnd   = endDate.getTime(),
+          dayMs        = 24*3600*1000,
+          daysCount    = Math.round((domainEnd-domainStart)/dayMs);
+
+    // update zone/task <select>
     function updateSelectors(){
       taskZoneSel.innerHTML = '';
       editZone.innerHTML    = '';
-      zones.forEach(z=>{
-        taskZoneSel.add(new Option(z.name, z.id));
-        editZone.add(new Option(z.name, z.id));
+      zonesY.toArray().forEach(z=>{
+        taskZoneSel.add(new Option(z.name,z.id));
+        editZone.add(   new Option(z.name,z.id));
       });
     }
 
-    // Add zone
+    // add zone handler
     addZoneBtn.onclick = ()=>{
-      const name=zoneNameIn.value.trim(); if(!name) return;
-      zones.push({ id:Date.now(), name, color:zoneColorIn.value });
-      zoneNameIn.value='';
-      updateSelectors(); renderTimeline();
-    };
-
-    // Add task
-    addTaskBtn.onclick = ()=>{
-      const color   = taskColorIn.value;
-      const zoneId  = +taskZoneSel.value;
-      const title   = taskNameIn.value.trim();
-      const start   = new Date(taskStartIn.value);
-      const end     = new Date(taskEndIn.value);
-      const contractor = taskContractor.value.trim()||undefined;
-      const workforce  = parseInt(taskWorkforce.value)||undefined;
-      const equipment  = taskEquipment.value.trim()||undefined;
-      if(!zoneId||!title||isNaN(start)||isNaN(end)||end<=start) return;
-      tasks.push({ 
-        id:Date.now(), color, zoneId, title, start, end,
-        contractor, workforce, equipment
-      });
-      taskNameIn.value='';
+      const name = zoneNameIn.value.trim();
+      if(!name) return;
+      zonesY.push([{ id:Date.now(), name, color:zoneColorIn.value }]);
+      zoneNameIn.value = '';
+      updateSelectors();
       renderTimeline();
     };
 
-    // Cancel edit
-    cancelEdit.onclick = ()=>{
-      editModal.style.display='none'; currentEdit=null;
+    // add task handler
+    addTaskBtn.onclick = ()=>{
+      const color   = taskColorIn.value,
+            zoneId  = +taskZoneSel.value,
+            title   = taskNameIn.value.trim(),
+            startMs = new Date(taskStartIn.value).getTime(),
+            endMs   = new Date(taskEndIn.value).getTime(),
+            contractor = taskContractor.value.trim()||undefined,
+            workforce  = parseInt(taskWorkforce.value)||undefined,
+            equipment  = taskEquipment.value.trim()||undefined;
+      if(!zoneId||!title||isNaN(startMs)||isNaN(endMs)||endMs<=startMs) return;
+      tasksY.push([{
+        id:Date.now(),
+        color, zoneId, title,
+        start:startMs, end:endMs,
+        contractor, workforce, equipment
+      }]);
     };
 
-    // Save edit
+    // share link
+    shareLinkBtn.onclick = ()=>{
+      navigator.clipboard.writeText(location.href)
+        .then(()=>alert('Link a vágólapra másolva'));
+    };
+
+    // edit modal handlers
+    let currentEdit = null;
+    cancelEdit.onclick = ()=>{ editModal.style.display='none'; currentEdit = null; };
     saveEdit.onclick = ()=>{
       if(!currentEdit) return;
       currentEdit.title      = editName.value;
@@ -238,83 +251,145 @@
       currentEdit.contractor = editContractor.value.trim()||undefined;
       currentEdit.workforce  = parseInt(editWorkforce.value)||undefined;
       currentEdit.equipment  = editEquipment.value.trim()||undefined;
-      currentEdit.start      = new Date(editStart.value);
-      currentEdit.end        = new Date(editEnd.value);
-      editModal.style.display='none'; currentEdit=null;
-      renderTimeline();
+      currentEdit.start      = new Date(editStart.value).getTime();
+      currentEdit.end        = new Date(editEnd.value).getTime();
+      const arr = tasksY.toArray(), i = arr.findIndex(x=>x.id===currentEdit.id);
+      tasksY.delete(i,1); tasksY.insert(i,[currentEdit]);
+      editModal.style.display='none'; currentEdit = null;
     };
 
-    // Render
+    // render timeline
     function renderTimeline(){
-      timelineEl.innerHTML='';
-      if(!zones.length) return;
-      const total = domainEnd-domainStart;
-      const W     = timelineEl.clientWidth;
-      const px    = W/total;
-      taktDisplay.textContent = 'Takt-idő: '+(total/zones.length/3600000).toFixed(1)+' óra';
-      // axis
-      const axis=document.createElement('div'); axis.className='axis';
-      ['05','06','07','08','09','10','11'].forEach((d,i)=>{
-        const lbl=document.createElement('div'); lbl.className='label';
-        lbl.style.left=(i/7*100)+'%'; lbl.textContent=d;
-        if(i===6) lbl.classList.add('sunday');
-        axis.append(lbl);
-      });
-      timelineEl.append(axis);
-      // lanes
-      const maxT = Math.max(1,...zones.map(z=>tasks.filter(t=>t.zoneId===z.id).length));
-      zones.forEach(z=>{
-        const lane=document.createElement('div'); lane.className='lane';
-        const list = tasks.filter(t=>t.zoneId===z.id);
-        lane.style.height=(list.length*36+10)+'px';
-        const intensity=list.length/maxT;
-        const shade=Math.floor(20+intensity*50).toString(16).padStart(2,'0');
-        lane.style.background=z.color+shade;
-        const nameEl=document.createElement('div');
-        nameEl.className='lane-name'; nameEl.textContent=z.name;
-        nameEl.style.background=z.color+'33';
-        const area=document.createElement('div'); area.className='tasks-area';
-        lane.append(nameEl,area);
+      // clear
+      axisEl.innerHTML = '';
+      timelineEl.querySelectorAll('.lane').forEach(e=>e.remove());
+      // takt
+      const zones = zonesY.toArray(),
+            total = domainEnd-domainStart;
+      taktDisplay.textContent = 'Takt: '+(total/zones.length/3600000).toFixed(1)+' óra';
+
+      // axis: daysCount days
+      for(let i=0;i<daysCount;i++){
+        const d = new Date(domainStart + i*dayMs),
+              lbl = document.createElement('div');
+        lbl.className = 'label';
+        lbl.textContent = d.getDate();
+        if(d.getDay()===0) lbl.classList.add('sunday');
+        axisEl.append(lbl);
+      }
+
+      // tasks
+      const tasks = tasksY.toArray(),
+            W     = timelineEl.clientWidth,
+            px    = W/total,
+            maxT  = Math.max(1, ...zones.map(z=>tasks.filter(t=>t.zoneId===z.id).length));
+
+      zones.forEach(zone=>{
+        const lane = document.createElement('div'); lane.className='lane';
+        const list = tasks.filter(t=>t.zoneId===zone.id);
+        lane.style.height = (list.length*36+10)+'px';
+        const intensity = list.length/maxT,
+              shade     = Math.floor(20+intensity*50).toString(16).padStart(2,'0');
+        lane.style.background = zone.color + shade;
+
+        const nameEl = document.createElement('div'); nameEl.className='lane-name';
+        nameEl.textContent = zone.name;
+        nameEl.style.background = zone.color + '33';
+
+        const area = document.createElement('div'); area.className='tasks-area';
+        lane.append(nameEl, area);
         timelineEl.append(lane);
+
         list.forEach((t,i)=>{
-          const left =(t.start.getTime()-domainStart)*px;
-          const width=(t.end.getTime()-t.start.getTime())*px;
-          const div=document.createElement('div'); div.className='task';
-          div.style.left=left+'px'; div.style.top=(i*36+5)+'px'; div.style.width=width+'px';
-          div.style.background=t.color;
-          let txt=t.title;
-          if(t.contractor) txt+=' ('+t.contractor+')';
-          div.textContent=txt;
-          div.oncontextmenu=e=>{
+          const left  = (t.start-domainStart)*px,
+                width = (t.end-t.start)*px,
+                div   = document.createElement('div');
+          div.className = 'task';
+          div.style.left   = left+'px';
+          div.style.top    = (i*36+5)+'px';
+          div.style.width  = width+'px';
+          div.style.background = t.color;
+          let txt = t.title;
+          if(t.contractor) txt += ' ('+t.contractor+')';
+          div.textContent = txt;
+
+          // drag
+          div.addEventListener('pointerdown', e=>{
+            if(e.button!==0) return;
+            e.preventDefault();
+            const x0=e.clientX, s0=t.start, dur=t.end-t.start;
+            function mv(ev){
+              const dx=ev.clientX-x0;
+              div.style.left = ((s0+dx/px-domainStart)*px)+'px';
+            }
+            function up(ev){
+              document.removeEventListener('pointermove',mv);
+              document.removeEventListener('pointerup',up);
+              const dx=ev.clientX-x0;
+              t.start = s0+dx/px;
+              t.end   = t.start+dur;
+              const arr=tasksY.toArray(), idx=arr.findIndex(x=>x.id===t.id);
+              tasksY.delete(idx,1); tasksY.insert(idx,[t]);
+            }
+            document.addEventListener('pointermove',mv);
+            document.addEventListener('pointerup',up);
+          });
+
+          // context menu
+          div.addEventListener('contextmenu', e=>{
             e.preventDefault(); currentEdit=t;
-            editName.value=t.title; editColor.value=t.color; editZone.value=t.zoneId;
-            editContractor.value=t.contractor||''; editWorkforce.value=t.workforce||'';
-            editEquipment.value=t.equipment||'';
-            let d='';
-            if(t.workforce) d+='Létszám: '+t.workforce+' fő<br>';
-            if(t.equipment) d+='Gép: '+t.equipment;
-            editDetails.innerHTML=d;
-            editStart.value=t.start.toISOString().slice(0,16);
-            editEnd.value  =t.end  .toISOString().slice(0,16);
-            editModal.style.display='flex';
-          };
+            contextMenu.style.top  = e.pageY+'px';
+            contextMenu.style.left = e.pageX+'px';
+            contextMenu.style.display='block';
+          });
+
           area.append(div);
         });
       });
     }
 
-    // Load + init
-    loadState();
+    // hide context on click outside
+    document.addEventListener('click', ()=>{ contextMenu.style.display='none'; });
+
+    // context menu actions
+    ctxEdit.onclick = ()=>{
+      if(!currentEdit) return;
+      editName.value      = currentEdit.title;
+      editColor.value     = currentEdit.color;
+      editZone.value      = currentEdit.zoneId;
+      editContractor.value= currentEdit.contractor||'';
+      editWorkforce.value = currentEdit.workforce||'';
+      editEquipment.value = currentEdit.equipment||'';
+      editDetails.innerHTML =
+        (currentEdit.workforce?'Létszám: '+currentEdit.workforce+' fő<br>':'') +
+        (currentEdit.equipment?'Gép: '+currentEdit.equipment:'');
+      editStart.value = new Date(currentEdit.start).toISOString().slice(0,16);
+      editEnd.value   = new Date(currentEdit.end).toISOString().slice(0,16);
+      editModal.style.display='flex';
+    };
+    ctxDuplicate.onclick = ()=>{
+      if(!currentEdit) return;
+      const dup = {...currentEdit,id:Date.now()};
+      tasksY.push([dup]);
+    };
+
+    // observe Yjs
+    zonesY.observe(()=>{ updateSelectors(); renderTimeline(); });
+    tasksY.observe(()=>renderTimeline());
+    milY.observe(()=>renderTimeline());
+
+    // init
     updateSelectors();
     renderTimeline();
 
-    // PDF
-    exportPdfBtn.onclick=async()=>{
-      const canvas=await html2canvas(timelineEl);
-      const img=canvas.toDataURL('image/png');
-      const { jsPDF }=window.jspdf;
-      const pdf=new jsPDF({orientation:'landscape'});
-      const w=pdf.internal.pageSize.getWidth(), h=canvas.height*w/canvas.width;
+    // PDF export
+    exportPdfBtn.onclick = async()=>{
+      const canvas = await html2canvas(timelineEl);
+      const img    = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({orientation:'landscape'});
+      const w   = pdf.internal.pageSize.getWidth();
+      const h   = canvas.height * w / canvas.width;
       pdf.addImage(img,'PNG',0,0,w,h);
       pdf.save('takt-ustemper.pdf');
     };
