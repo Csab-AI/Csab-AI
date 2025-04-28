@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Lean Takt Ütemező – Shareable State</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+          crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+          crossorigin="anonymous"></script>
+  <style>
+    .timeline-wrapper { position:relative; width:100%; height:400px; overflow:auto; border:1px solid #ddd; background:#fff }
+    .takt-display     { font-size:14px; font-weight:500; margin-bottom:8px }
+    .axis             { position:sticky; top:0; z-index:10; height:40px; background:#f9fafb }
+    .axis .label      { position:absolute; top:0; width:calc(100%/7); text-align:center; font-size:12px; color:#555 }
+    .axis .sunday     { background:#e5e7eb }
+    .milestone        { position:absolute; top:0; width:2px; height:calc(100% - 40px); background:#ff5722 }
+    .milestone .label { position:absolute; top:0; left:4px; font-size:10px; color:#ff5722 }
+    .lane             { position:relative; border-top:1px solid #e5e7eb; margin-bottom:6px }
+    .lane:nth-child(odd) { background:#f3f4f6 }
+    .tasks-area       { position:absolute; left:120px; top:0; right:0; bottom:0 }
+    .lane-name        { position:absolute; left:0; top:0; width:120px; background:#fff; border-right:1px solid #ddd;
+                        display:flex; align-items:center; justify-content:center; font-weight:600; height:100%; color:#333 }
+    .task             { position:absolute; height:32px; border-radius:4px; color:#fff; padding:4px 6px; font-size:12px;
+                        overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:grab;
+                        box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:transform .2s,box-shadow .2s }
+    .task:hover       { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.2) }
+    #editModal        { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+                        align-items:center; justify-content:center; z-index:50 }
+    #editModal .modal-content { background:#fff; padding:20px; border-radius:8px; width:360px;
+                                box-shadow:0 2px 10px rgba(0,0,0,0.2); }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="container mx-auto p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-3xl font-bold">Lean Takt Ütemező</h1>
+      <div class="flex space-x-2">
+        <button id="shareLink" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+          Megosztási link
+        </button>
+        <button id="exportPdf" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+          PDF export
+        </button>
+      </div>
+    </div>
+
+    <div id="taktDisplay" class="takt-display"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+      <aside class="bg-white shadow rounded p-4 space-y-4">
+        <h2 class="text-xl font-semibold">Beállítások</h2>
+        <!-- Zóna hozzáadása -->
+        <div>
+          <label class="block mb-1">Zóna név</label>
+          <input type="text" id="zoneName" placeholder="Zóna név" class="w-full border px-2 py-1 rounded mb-1">
+          <input type="color" id="zoneColor" value="#4f46e5" class="w-full mb-2 h-8 p-0">
+          <button id="addZone" class="w-full bg-blue-600 text-white py-1 rounded">Zóna hozzáadása</button>
+        </div>
+
+        <!-- Feladat hozzáadása -->
+        <div>
+          <h3 class="font-semibold mb-1">Feladat hozzáadása</h3>
+          <label class="block mb-1">Szín</label>
+          <input type="color" id="taskColor" value="#3b82f6" class="w-full mb-2 h-8 p-0">
+          <label class="block mb-1">Zóna</label>
+          <select id="taskZone" class="w-full border px-2 py-1 rounded mb-1"></select>
+          <label class="block mb-1">Feladat név</label>
+          <input type="text" id="taskName" placeholder="Feladat név" class="w-full border px-2 py-1 rounded mb-1">
+          <label class="block mb-1">Kezdés</label>
+          <input type="datetime-local" id="taskStart" class="w-full border px-2 py-1 rounded mb-1">
+          <label class="block mb-1">Befejezés</label>
+          <input type="datetime-local" id="taskEnd" class="w-full border px-2 py-1 rounded mb-2">
+          <label class="block mb-1">Vállalkozó (opcionális)</label>
+          <input type="text" id="taskContractor" placeholder="Név" class="w-full border px-2 py-1 rounded mb-1">
+          <label class="block mb-1">Létszám (opcionális)</label>
+          <input type="number" id="taskWorkforce" placeholder="Fő" class="w-full border px-2 py-1 rounded mb-1">
+          <label class="block mb-1">Vezérgép (opcionális)</label>
+          <input type="text" id="taskEquipment" placeholder="Gép/ber." class="w-full border px-2 py-1 rounded mb-2">
+          <button id="addTask" class="w-full bg-indigo-600 text-white py-1 rounded">Feladat hozzáadása</button>
+        </div>
+      </aside>
+
+      <main class="lg:col-span-3">
+        <div id="timelineContainer" class="timeline-wrapper"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="flex">
+    <div class="modal-content">
+      <h3 class="text-lg font-semibold mb-2">Feladat szerkesztése</h3>
+      <label class="block mb-1">Név</label>
+      <input type="text" id="editName" class="w-full border px-2 py-1 rounded mb-2">
+      <label class="block mb-1">Szín</label>
+      <input type="color" id="editColor" class="w-full mb-2 h-8 p-0">
+      <label class="block mb-1">Zóna</label>
+      <select id="editZone" class="w-full border px-2 py-1 rounded mb-2"></select>
+      <label class="block mb-1">Vállalkozó</label>
+      <input type="text" id="editContractor" class="w-full border px-2 py-1 rounded mb-2">
+      <div id="editContractorDetails" class="mb-2 text-sm text-gray-600"></div>
+      <label class="block mb-1">Létszám</label>
+      <input type="number" id="editWorkforce" class="w-full border px-2 py-1 rounded mb-2">
+      <label class="block mb-1">Vezérgép</label>
+      <input type="text" id="editEquipment" class="w-full border px-2 py-1 rounded mb-4">
+      <label class="block mb-1">Kezdés</label>
+      <input type="datetime-local" id="editStart" class="w-full border px-2 py-1 rounded mb-2">
+      <label class="block mb-1">Befejezés</label>
+      <input type="datetime-local" id="editEnd" class="w-full border px-2 py-1 rounded mb-4">
+      <div class="flex justify-end space-x-2">
+        <button id="cancelEdit" class="bg-gray-300 px-3 py-1 rounded">Mégse</button>
+        <button id="saveEdit" class="bg-blue-600 text-white px-3 py-1 rounded">Mentés</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const zones      = [];
+    const tasks      = [];
+    let currentEdit  = null;
+
+    const domainStart= new Date('2025-05-05T00:00:00').getTime();
+    const domainEnd  = domainStart + 7*24*3600*1000;
+
+    // DOM
+    const zoneNameIn    = document.getElementById('zoneName'),
+          zoneColorIn   = document.getElementById('zoneColor'),
+          addZoneBtn    = document.getElementById('addZone'),
+          taskColorIn   = document.getElementById('taskColor'),
+          taskZoneSel   = document.getElementById('taskZone'),
+          taskNameIn    = document.getElementById('taskName'),
+          taskStartIn   = document.getElementById('taskStart'),
+          taskEndIn     = document.getElementById('taskEnd'),
+          taskContractor= document.getElementById('taskContractor'),
+          taskWorkforce = document.getElementById('taskWorkforce'),
+          taskEquipment = document.getElementById('taskEquipment'),
+          addTaskBtn    = document.getElementById('addTask'),
+          shareLinkBtn  = document.getElementById('shareLink'),
+          exportPdfBtn  = document.getElementById('exportPdf'),
+          timelineEl    = document.getElementById('timelineContainer'),
+          taktDisplay   = document.getElementById('taktDisplay'),
+          editModal     = document.getElementById('editModal'),
+          editName      = document.getElementById('editName'),
+          editColor     = document.getElementById('editColor'),
+          editZone      = document.getElementById('editZone'),
+          editContractor= document.getElementById('editContractor'),
+          editDetails   = document.getElementById('editContractorDetails'),
+          editWorkforce = document.getElementById('editWorkforce'),
+          editEquipment = document.getElementById('editEquipment'),
+          editStart     = document.getElementById('editStart'),
+          editEnd       = document.getElementById('editEnd'),
+          cancelEdit    = document.getElementById('cancelEdit'),
+          saveEdit      = document.getElementById('saveEdit');
+
+    // Load state from URL?
+    function loadState(){
+      const p = new URLSearchParams(location.search), s = p.get('state');
+      if(!s) return;
+      try{
+        const obj = JSON.parse(atob(s));
+        zones.splice(0,zones.length,...obj.zones);
+        tasks.splice(0,tasks.length,...obj.tasks.map(t=>{
+          t.start=new Date(t.start); t.end=new Date(t.end);
+          return t;
+        }));
+      }catch(e){ console.warn('Hibás state param'); }
+    }
+
+    // Save state to URL & clipboard
+    shareLinkBtn.onclick = ()=>{
+      const state = { zones, tasks };
+      const encoded = btoa(JSON.stringify({
+        zones,
+        tasks: tasks.map(t=>({
+          ...t,
+          start:t.start.toISOString(),
+          end:  t.end.toISOString()
+        }))
+      }));
+      const url = location.origin+location.pathname+'?state='+encoded;
+      navigator.clipboard.writeText(url)
+        .then(()=>alert('Link másolva a vágólapra'));
+    };
+
+    // Refresh selectors
+    function updateSelectors(){
+      taskZoneSel.innerHTML = '';
+      editZone.innerHTML    = '';
+      zones.forEach(z=>{
+        taskZoneSel.add(new Option(z.name, z.id));
+        editZone.add(new Option(z.name, z.id));
+      });
+    }
+
+    // Add zone
+    addZoneBtn.onclick = ()=>{
+      const name=zoneNameIn.value.trim(); if(!name) return;
+      zones.push({ id:Date.now(), name, color:zoneColorIn.value });
+      zoneNameIn.value='';
+      updateSelectors(); renderTimeline();
+    };
+
+    // Add task
+    addTaskBtn.onclick = ()=>{
+      const color   = taskColorIn.value;
+      const zoneId  = +taskZoneSel.value;
+      const title   = taskNameIn.value.trim();
+      const start   = new Date(taskStartIn.value);
+      const end     = new Date(taskEndIn.value);
+      const contractor = taskContractor.value.trim()||undefined;
+      const workforce  = parseInt(taskWorkforce.value)||undefined;
+      const equipment  = taskEquipment.value.trim()||undefined;
+      if(!zoneId||!title||isNaN(start)||isNaN(end)||end<=start) return;
+      tasks.push({ 
+        id:Date.now(), color, zoneId, title, start, end,
+        contractor, workforce, equipment
+      });
+      taskNameIn.value='';
+      renderTimeline();
+    };
+
+    // Cancel edit
+    cancelEdit.onclick = ()=>{
+      editModal.style.display='none'; currentEdit=null;
+    };
+
+    // Save edit
+    saveEdit.onclick = ()=>{
+      if(!currentEdit) return;
+      currentEdit.title      = editName.value;
+      currentEdit.color      = editColor.value;
+      currentEdit.zoneId     = +editZone.value;
+      currentEdit.contractor = editContractor.value.trim()||undefined;
+      currentEdit.workforce  = parseInt(editWorkforce.value)||undefined;
+      currentEdit.equipment  = editEquipment.value.trim()||undefined;
+      currentEdit.start      = new Date(editStart.value);
+      currentEdit.end        = new Date(editEnd.value);
+      editModal.style.display='none'; currentEdit=null;
+      renderTimeline();
+    };
+
+    // Render
+    function renderTimeline(){
+      timelineEl.innerHTML='';
+      if(!zones.length) return;
+      const total = domainEnd-domainStart;
+      const W     = timelineEl.clientWidth;
+      const px    = W/total;
+      taktDisplay.textContent = 'Takt-idő: '+(total/zones.length/3600000).toFixed(1)+' óra';
+      // axis
+      const axis=document.createElement('div'); axis.className='axis';
+      ['05','06','07','08','09','10','11'].forEach((d,i)=>{
+        const lbl=document.createElement('div'); lbl.className='label';
+        lbl.style.left=(i/7*100)+'%'; lbl.textContent=d;
+        if(i===6) lbl.classList.add('sunday');
+        axis.append(lbl);
+      });
+      timelineEl.append(axis);
+      // lanes
+      const maxT = Math.max(1,...zones.map(z=>tasks.filter(t=>t.zoneId===z.id).length));
+      zones.forEach(z=>{
+        const lane=document.createElement('div'); lane.className='lane';
+        const list = tasks.filter(t=>t.zoneId===z.id);
+        lane.style.height=(list.length*36+10)+'px';
+        const intensity=list.length/maxT;
+        const shade=Math.floor(20+intensity*50).toString(16).padStart(2,'0');
+        lane.style.background=z.color+shade;
+        const nameEl=document.createElement('div');
+        nameEl.className='lane-name'; nameEl.textContent=z.name;
+        nameEl.style.background=z.color+'33';
+        const area=document.createElement('div'); area.className='tasks-area';
+        lane.append(nameEl,area);
+        timelineEl.append(lane);
+        list.forEach((t,i)=>{
+          const left =(t.start.getTime()-domainStart)*px;
+          const width=(t.end.getTime()-t.start.getTime())*px;
+          const div=document.createElement('div'); div.className='task';
+          div.style.left=left+'px'; div.style.top=(i*36+5)+'px'; div.style.width=width+'px';
+          div.style.background=t.color;
+          let txt=t.title;
+          if(t.contractor) txt+=' ('+t.contractor+')';
+          div.textContent=txt;
+          div.oncontextmenu=e=>{
+            e.preventDefault(); currentEdit=t;
+            editName.value=t.title; editColor.value=t.color; editZone.value=t.zoneId;
+            editContractor.value=t.contractor||''; editWorkforce.value=t.workforce||'';
+            editEquipment.value=t.equipment||'';
+            let d='';
+            if(t.workforce) d+='Létszám: '+t.workforce+' fő<br>';
+            if(t.equipment) d+='Gép: '+t.equipment;
+            editDetails.innerHTML=d;
+            editStart.value=t.start.toISOString().slice(0,16);
+            editEnd.value  =t.end  .toISOString().slice(0,16);
+            editModal.style.display='flex';
+          };
+          area.append(div);
+        });
+      });
+    }
+
+    // Load + init
+    loadState();
+    updateSelectors();
+    renderTimeline();
+
+    // PDF
+    exportPdfBtn.onclick=async()=>{
+      const canvas=await html2canvas(timelineEl);
+      const img=canvas.toDataURL('image/png');
+      const { jsPDF }=window.jspdf;
+      const pdf=new jsPDF({orientation:'landscape'});
+      const w=pdf.internal.pageSize.getWidth(), h=canvas.height*w/canvas.width;
+      pdf.addImage(img,'PNG',0,0,w,h);
+      pdf.save('takt-ustemper.pdf');
+    };
+  })();
+  </script>
+</body>
+</html>
