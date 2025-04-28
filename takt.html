@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Lean Takt Ütemező – Megosztás, PDF & Szerkesztés</title>
+  <title>Lean Takt Ütemező – Munkasűrűség &amp; Kapacitás</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
   <style>
-    .timeline-wrapper { position:relative; width:100%; height:400px; overflow:auto; border:1px solid #ddd; background:#fff }
+    .timeline-wrapper { position:relative; width:100%; height:450px; overflow:auto; border:1px solid #ddd; background:#fff }
+    .takt-display     { font-size:14px; font-weight:500; margin-bottom:4px }
     .axis             { position:sticky; top:0; z-index:10; display:flex; background:#f9fafb }
-    .axis .label      { flex:0 0 auto; text-align:center; font-size:12px; color:#555; padding:4px 0 }
+    .axis .label      { flex:0 0 auto; text-align:center; font-size:12px; color:#555; padding:2px 0; box-sizing:border-box; }
     .axis .sunday     { background:#e5e7eb }
     .lane             { position:relative; border-top:1px solid #e5e7eb; margin-bottom:6px }
-    .lane:nth-child(odd) { background:#f3f4f6 }
+    .lane:nth-child(odd){ background:#f3f4f6 }
     .tasks-area       { position:absolute; left:120px; top:0; right:0; bottom:0 }
     .lane-name        { position:absolute; left:0; top:0; width:120px; background:#fff; border-right:1px solid #ddd;
                         display:flex; align-items:center; justify-content:center; font-weight:600; height:100%; color:#333 }
@@ -23,6 +24,7 @@
                         overflow:hidden; white-space:nowrap; text-overflow:ellipsis; cursor:grab;
                         box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:transform .2s,box-shadow .2s }
     .task:hover       { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.2) }
+    .zone-window      { position:absolute; top:0; height:100%; border-radius:4px; opacity:0.1 }
     #editModal        { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
                         align-items:center; justify-content:center; z-index:50 }
     #editModal .modal-content { background:#fff; padding:20px; border-radius:8px; width:360px;
@@ -31,7 +33,7 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
   <div class="container mx-auto p-6">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-2">
       <h1 class="text-3xl font-bold">Lean Takt Ütemező</h1>
       <div class="flex space-x-2">
         <button id="shareLink" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
@@ -42,6 +44,7 @@
         </button>
       </div>
     </div>
+    <div id="taktDisplay" class="takt-display"></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
       <aside class="bg-white shadow rounded p-4 space-y-4">
@@ -66,7 +69,7 @@
           <input type="datetime-local" id="taskStart" class="w-full border px-2 py-1 rounded mb-1">
           <label class="block mb-1">Befejezés</label>
           <input type="datetime-local" id="taskEnd" class="w-full border px-2 py-1 rounded mb-2">
-          <label class="block mb-1">Vállalkozó neve (opcionális)</label>
+          <label class="block mb-1">Vállalkozó (opcionális)</label>
           <input type="text" id="taskContractor" placeholder="Név" class="w-full border px-2 py-1 rounded mb-1">
           <label class="block mb-1">Létszám (opcionális)</label>
           <input type="number" id="taskWorkforce" placeholder="Fő" class="w-full border px-2 py-1 rounded mb-1">
@@ -75,13 +78,14 @@
           <button id="addTask" class="w-full bg-indigo-600 text-white py-1 rounded">Feladat hozzáadása</button>
         </div>
       </aside>
-
       <main class="lg:col-span-3">
         <div id="timelineContainer" class="timeline-wrapper">
           <!-- hónapok tengely -->
           <div id="monthAxis" class="axis"></div>
           <!-- napok tengely -->
           <div id="axis" class="axis"></div>
+          <!-- kapacitás tengely -->
+          <div id="capacityAxis" class="axis"></div>
         </div>
       </main>
     </div>
@@ -91,7 +95,6 @@
   <div id="editModal" class="flex">
     <div class="modal-content">
       <h3 class="text-lg font-semibold mb-2">Feladat szerkesztése</h3>
-      <!-- mezők ... ugyanazok -->
       <label class="block mb-1">Név</label>
       <input type="text" id="editName" class="w-full border px-2 py-1 rounded mb-2">
       <label class="block mb-1">Szín</label>
@@ -148,6 +151,7 @@
           timelineEl      = document.getElementById('timelineContainer'),
           monthAxisEl     = document.getElementById('monthAxis'),
           axisEl          = document.getElementById('axis'),
+          capacityEl      = document.getElementById('capacityAxis'),
           editModal       = document.getElementById('editModal'),
           editName        = document.getElementById('editName'),
           editColor       = document.getElementById('editColor'),
@@ -176,7 +180,6 @@
       const url = location.origin + location.pathname + '?state=' + encoded;
       navigator.clipboard.writeText(url).then(()=>alert('Link másolva'));
     };
-
     // PDF export
     exportPdfBtn.onclick = async ()=>{
       const canvas = await html2canvas(timelineEl);
@@ -191,7 +194,7 @@
 
     addZoneBtn.onclick = ()=>{
       const name = zoneNameIn.value.trim();
-      if(!name) return;
+      if(!name)return;
       zones.push({ id:Date.now(), name, color:zoneColorIn.value });
       zoneNameIn.value='';
       updateSelectors();
@@ -199,25 +202,22 @@
     };
 
     addTaskBtn.onclick = ()=>{
-      const zoneId     = +taskZoneSel.value;
-      const title      = taskNameIn.value.trim();
-      const start      = new Date(taskStartIn.value);
-      const end        = new Date(taskEndIn.value);
-      const contractor = taskContractor.value.trim()||undefined;
-      const workforce  = parseInt(taskWorkforce.value)||undefined;
-      const equipment  = taskEquipment.value.trim()||undefined;
+      const zoneId     = +taskZoneSel.value,
+            title      = taskNameIn.value.trim(),
+            start      = new Date(taskStartIn.value),
+            end        = new Date(taskEndIn.value),
+            contractor = taskContractor.value.trim()||undefined,
+            workforce  = parseInt(taskWorkforce.value)||0,
+            equipment  = taskEquipment.value.trim()||undefined;
       if(!zoneId||!title||isNaN(start)||isNaN(end)||end<=start) return;
-      tasks.push({
-        id:Date.now(), zoneId, title, color:taskColorIn.value,
-        start, end, contractor, workforce, equipment
-      });
+      tasks.push({ id:Date.now(), zoneId, title, color:taskColorIn.value,
+                   start, end, contractor, workforce, equipment });
       taskNameIn.value=''; taskContractor.value=''; taskWorkforce.value=''; taskEquipment.value='';
       renderTimeline();
     };
 
     cancelEdit.onclick = ()=>{
-      editModal.style.display='none';
-      currentEdit=null;
+      editModal.style.display='none'; currentEdit=null;
     };
     saveEdit.onclick = ()=>{
       if(!currentEdit) return;
@@ -227,62 +227,110 @@
       currentEdit.start      = new Date(editStart.value);
       currentEdit.end        = new Date(editEnd.value);
       currentEdit.contractor = editContractor.value.trim()||undefined;
-      currentEdit.workforce  = parseInt(editWorkforce.value)||undefined;
+      currentEdit.workforce  = parseInt(editWorkforce.value)||0;
       currentEdit.equipment  = editEquipment.value.trim()||undefined;
       renderTimeline();
-      editModal.style.display='none';
-      currentEdit=null;
+      editModal.style.display='none'; currentEdit=null;
     };
 
     function renderTimeline(){
-      // hónap tengely
+      // 1) hónap tengely
       monthAxisEl.innerHTML = '';
-      const monthNames = ['Jan','Feb','Már','Ápr','Máj','Jún','Júl','Aug','Szep','Okt','Nov','Dec'];
+      const monthNames=['Jan','Feb','Már','Ápr','Máj','Jún','Júl','Aug','Szep','Okt','Nov','Dec'];
       let cursor = domainStart;
-      while(cursor<domainEnd){
-        const d = new Date(cursor),
-              y = d.getFullYear(), m = d.getMonth(),
-              startOfMonth = new Date(y,m,1).getTime(),
-              start = Math.max(cursor, startOfMonth),
-              end   = Math.min(domainEnd, new Date(y,m+1,1).getTime()),
-              days  = Math.round((end-start)/dayMs);
-        const label = document.createElement('div');
-        label.className='label';
-        label.style.flexBasis = (days/daysCount*100)+'%';
-        label.textContent = monthNames[m] + ' ' + y;
-        monthAxisEl.append(label);
+      while(cursor < domainEnd){
+        const d=new Date(cursor),
+              y=d.getFullYear(), m=d.getMonth(),
+              startOfMonth=new Date(y,m,1).getTime(),
+              endOfMonth=new Date(y,m+1,1).getTime(),
+              start=Math.max(cursor,startOfMonth),
+              end=Math.min(domainEnd,endOfMonth),
+              days=Math.round((end-start)/dayMs);
+        const lbl=document.createElement('div');
+        lbl.className='label';
+        lbl.style.flexBasis = (days/daysCount*100)+'%';
+        lbl.textContent = monthNames[m]+' '+y;
+        monthAxisEl.append(lbl);
         cursor = end;
       }
-      // nap tengely
-      axisEl.innerHTML = '';
+
+      // 2) nap tengely
+      axisEl.innerHTML='';
       for(let i=0;i<daysCount;i++){
-        const d = new Date(domainStart + i*dayMs),
-              lbl = document.createElement('div');
+        const d=new Date(domainStart + i*dayMs),
+              lbl=document.createElement('div');
         lbl.className='label';
         lbl.style.flexBasis = (100/daysCount)+'%';
         lbl.textContent = d.getDate();
         if(d.getDay()===0) lbl.classList.add('sunday');
         axisEl.append(lbl);
       }
-      // sávok
+
+      // 3) kapacitás tengely
+      capacityEl.innerHTML='';
+      const capacities = Array(daysCount).fill(0);
+      tasks.forEach(t=>{
+        const startIdx = Math.max(0, Math.floor((t.start.getTime()-domainStart)/dayMs));
+        const endIdx   = Math.min(daysCount-1, Math.floor((t.end.getTime()-domainStart)/dayMs));
+        for(let i=startIdx;i<=endIdx;i++){
+          capacities[i] += t.workforce || 0;
+        }
+      });
+      capacities.forEach(c=>{
+        const lbl=document.createElement('div');
+        lbl.className='label';
+        lbl.style.flexBasis = (100/daysCount)+'%';
+        lbl.textContent = c>0 ? c : '';
+        capacityEl.append(lbl);
+      });
+
+      // 4) takt-idő kalkuláció (napokban)
+      const totalDays = daysCount;
+      const taktPerZone = (zones.length>0) ? totalDays / zones.length : 0;
+      document.getElementById('taktDisplay').textContent =
+        'Takt-idő: '+taktPerZone.toFixed(1)+' nap';
+
+      // 5) sávok
       document.querySelectorAll('.lane').forEach(e=>e.remove());
-      const total = domainEnd - domainStart,
-            W     = timelineEl.clientWidth,
-            px    = W/total,
-            maxT  = Math.max(1, ...zones.map(z=>tasks.filter(t=>t.zoneId===z.id).length));
+      const totalMs = domainEnd-domainStart;
+      const W       = timelineEl.clientWidth;
+      const px      = W/totalMs;
+      const maxT    = Math.max(1, ...zones.map(z=>tasks.filter(t=>t.zoneId===z.id).length));
+
       zones.forEach(zone=>{
-        const lane = document.createElement('div'); lane.className='lane';
+        const lane = document.createElement('div');
+        lane.className='lane';
         const list = tasks.filter(t=>t.zoneId===zone.id);
         lane.style.height = (list.length*36+10)+'px';
+
+        // zone-window (időablak)
+        if(list.length){
+          const starts = list.map(t=>t.start.getTime()),
+                ends   = list.map(t=>t.end.getTime()),
+                zs = Math.min(...starts),
+                ze = Math.max(...ends),
+                wleft = (zs-domainStart)*px,
+                wwidth= (ze-zs)*px;
+          const zw = document.createElement('div');
+          zw.className='zone-window';
+          zw.style.left       = wleft+'px';
+          zw.style.width      = wwidth+'px';
+          zw.style.background = zone.color;
+          lane.append(zw);
+        }
+
+        // heatmap háttér
         const shade = Math.floor(20 + (list.length/maxT)*50).toString(16).padStart(2,'0');
         lane.style.background = zone.color + shade;
 
-        const nameEl = document.createElement('div');
+        const nameEl=document.createElement('div');
         nameEl.className='lane-name';
-        nameEl.textContent = zone.name;
-        nameEl.style.background = zone.color + '33';
+        nameEl.textContent=zone.name;
+        nameEl.style.background=zone.color+'33';
 
-        const area = document.createElement('div'); area.className='tasks-area';
+        const area=document.createElement('div');
+        area.className='tasks-area';
+
         lane.append(nameEl, area);
         timelineEl.append(lane);
 
@@ -291,35 +339,36 @@
                 width = (t.end.getTime()-t.start.getTime())*px,
                 div   = document.createElement('div');
           div.className='task';
-          div.style.left  = left+'px';
-          div.style.top   = (i*36+5)+'px';
-          div.style.width = width+'px';
+          div.style.left       = left+'px';
+          div.style.top        = (i*36+5)+'px';
+          div.style.width      = width+'px';
           div.style.background = t.color;
           let txt = t.title;
           if(t.contractor) txt += ' ('+t.contractor+')';
           div.textContent = txt;
 
-          // drag
+          // drag vízszintesen
           div.addEventListener('pointerdown',e=>{
             if(e.button!==0) return;
             e.preventDefault();
-            const x0 = e.clientX, s0 = t.start.getTime(), dur = t.end.getTime() - s0;
+            const x0=e.clientX, s0=t.start.getTime(), dur=t.end.getTime()-s0;
             function mv(ev){
-              const dx = ev.clientX - x0;
-              div.style.left = ((s0 + dx/px - domainStart)*px)+'px';
+              const dx=ev.clientX-x0;
+              div.style.left=((s0+dx/px-domainStart)*px)+'px';
             }
-            function up(ev){
+            function up(){
               document.removeEventListener('pointermove',mv);
               document.removeEventListener('pointerup',up);
-              const dx = ev.clientX - x0;
-              t.start = new Date(s0 + dx/px);
-              t.end   = new Date(t.start.getTime() + dur);
+              const dx=event.clientX-x0;
+              t.start=new Date(s0+dx/px);
+              t.end=new Date(t.start.getTime()+dur);
               renderTimeline();
             }
             document.addEventListener('pointermove',mv);
             document.addEventListener('pointerup',up);
           });
-          // jobb klikk
+
+          // jobb klikk: szerkesztés
           div.addEventListener('contextmenu',e=>{
             e.preventDefault();
             currentEdit=t;
@@ -327,9 +376,9 @@
             editColor.value     = t.color;
             editZone.value      = t.zoneId;
             editStart.value     = t.start.toISOString().slice(0,16);
-            editEnd.value       = t.end.toISOString().slice(0,16);
+            editEnd.value       = t.end  .toISOString().slice(0,16);
             editContractor.value= t.contractor||'';
-            editWorkforce.value = t.workforce||'';
+            editWorkforce.value = t.workforce||0;
             editEquipment.value = t.equipment||'';
             editModal.style.display='flex';
           });
@@ -343,7 +392,7 @@
     loadState();
     updateSelectors();
     renderTimeline();
-    window.addEventListener('resize',renderTimeline);
+    window.addEventListener('resize', renderTimeline);
   })();
   </script>
 </body>
