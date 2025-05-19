@@ -9,6 +9,7 @@
     #toolbar { position:fixed; top:0; left:0; right:200px; background:#f4f4f4; padding:8px; z-index:300;
       display:flex; align-items:center; gap:8px; overflow-x:auto; }
     #toolbar button, #toolbar input, #toolbar label, #toolbar select { padding:4px; }
+    #toolbar button.active { background:#2196f3; color:#fff; }
     #stats-panel { position:fixed; top:0; right:0; width:200px; bottom:0; background:#fff;
       border-left:1px solid #ccc; padding:8px; font-size:12px; overflow-y:auto; z-index:300; }
     #canvas-container { position:absolute; top:48px; left:0; right:200px; bottom:0; z-index:100; }
@@ -99,6 +100,7 @@
     let isRect=false, rectStart=null, currentRect=null;
     canvas.isDrawingMode=true;
     canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
+
     // UI refs
     const fileInput=document.getElementById('file-input');
     const drawBtn=document.getElementById('draw-btn');
@@ -116,15 +118,25 @@
     const modal=document.getElementById('modal');
     const form=document.getElementById('postit-form');
     const cancelBtn=document.getElementById('cancel-btn');
+
+    // Helper: button highlight
+    function setActiveButton(btn) {
+      [drawBtn,lineBtn,rectBtn,panBtn,textBtn,postitBtn].forEach(b=>b.classList.remove('active'));
+      if(btn) btn.classList.add('active');
+    }
+
     // Mode toggles
-    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;};
-    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;};
-    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;};
-    panBtn.onclick=()=>{mode='pan';canvas.isDrawingMode=false;};
-    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;};
+    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);};
+    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;setActiveButton(lineBtn);};
+    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;setActiveButton(rectBtn);};
+    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;setActiveButton(textBtn);};
+    panBtn.onclick=()=>{
+      mode='pan';canvas.isDrawingMode=false;setActiveButton(panBtn);
+      canvas.selection=false; // ne lehessen elemet kijelölni pan módban
+      canvas.defaultCursor='grab';
+    };
     postitBtn.onclick=()=>{
       form.reset();
-      // prefill
       const tpl=templateSelect.value;
       document.getElementById('header-input').value=tpl;
       const cmap={
@@ -148,9 +160,14 @@
       document.getElementById('color-input').value=cmap[tpl]||'#ffeb3b';
       overlay.style.display=modal.style.display='block';
     };
+
+    // Színes gombok
+    setActiveButton(drawBtn);
+
     colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
     strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
-    // Load PDF
+
+    // PDF beolvasás
     fileInput.onchange=e=>{
       const f=e.target.files[0]; if(!f||f.type!=='application/pdf')return;
       const r=new FileReader();r.onload=function(){
@@ -162,42 +179,160 @@
             const c=document.getElementById('canvas-container');
             const scale=Math.min(c.clientWidth/tmp.width,c.clientHeight/tmp.height);
             canvas.setWidth(tmp.width*scale);canvas.setHeight(tmp.height*scale);
-            fabric.Image.fromURL(tmp.toDataURL(),img=>{img.set({originX:'left',originY:'top'});img.scale(scale);canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas));});
+            fabric.Image.fromURL(tmp.toDataURL(),img=>{
+              img.set({originX:'left',originY:'top'});img.scale(scale);
+              canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas));
+            });
           });
         }));
       };r.readAsArrayBuffer(f);
     };
-    // Canvas events
+
+    // Pan & Zoom state
+    let isDragging=false, lastPosX=0, lastPosY=0;
+
+    // Canvas events (rajzeszközök és pan/zoom)
     canvas.on('mouse:down',opt=>{
-      const e=opt.e,p=canvas.getPointer(e);
-      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);} 
-      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);} 
-      else if(mode==='pan'&&e.button===1){canvas.isDragging=true;canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;} 
-      else if(mode==='text'){const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));mode='draw';canvas.isDrawingMode=true;} 
-      else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}    });
-    canvas.on('mouse:move',opt=>{
-      const e=opt.e,p=canvas.getPointer(e);
-      if(isLine&&currentLine){const dx=Math.abs(p.x-lineStart.x),dy=Math.abs(p.y-lineStart.y);
-        if(e.shiftKey){if(dx>dy)currentLine.set({x2:p.x,y2:lineStart.y});else currentLine.set({x2:lineStart.x,y2:p.y});}
-        else currentLine.set({x2:p.x,y2:p.y});canvas.requestRenderAll();return;}
-      if(isRect&&currentRect){const w=p.x-rectStart.x,h=p.y-rectStart.y;
-        currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});canvas.requestRenderAll();return;}
-      if(canvas.isDragging){const v=canvas.viewportTransform;v[4]+=e.clientX-canvas.lastPosX;v[5]+=e.clientY-canvas.lastPosY;canvas.renderAll();canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;}    });
-    canvas.on('mouse:up',opt=>{
-      if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;}
-      if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;}
-      canvas.isDragging=false;
+      const e=opt.e, p=canvas.getPointer(e);
+      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
+      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
+      else if(mode==='pan'&&e.button===0){
+        isDragging=true;
+        lastPosX=e.clientX;
+        lastPosY=e.clientY;
+        canvas.defaultCursor='grabbing';
+      }
+      else if(mode==='text'){
+        const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));
+        mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);
+      }
+      else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){
+        mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
+      }
     });
-    canvas.on('mouse:wheel',opt=>{const d=opt.e.deltaY;let z=canvas.getZoom()*Math.pow(0.999,d);z=Math.min(Math.max(z,0.5),20);canvas.zoomToPoint({x:opt.e.offsetX,y:opt.е.offsetY},z);opt.e.preventDefault();opt.e.stopPropagation();});
+
+    canvas.on('mouse:move',opt=>{
+      const e=opt.e, p=canvas.getPointer(e);
+      if(isLine&&currentLine){
+        const dx=Math.abs(p.x-lineStart.x),dy=Math.abs(p.y-lineStart.y);
+        if(e.shiftKey){
+          if(dx>dy)currentLine.set({x2:p.x,y2:lineStart.y});
+          else currentLine.set({x2:lineStart.x,y2:p.y});
+        }
+        else currentLine.set({x2:p.x,y2:p.y});
+        canvas.requestRenderAll();return;
+      }
+      if(isRect&&currentRect){
+        const w=p.x-rectStart.x, h=p.y-rectStart.y;
+        currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});
+        canvas.requestRenderAll();return;
+      }
+      if(mode==='pan'&&isDragging){
+        const v=canvas.viewportTransform;
+        v[4]+=e.clientX-lastPosX;
+        v[5]+=e.clientY-lastPosY;
+        canvas.setViewportTransform(v);
+        lastPosX=e.clientX; lastPosY=e.clientY;
+      }
+    });
+
+    canvas.on('mouse:up',opt=>{
+      if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
+      if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
+      isDragging=false;
+      if(mode==='pan') canvas.defaultCursor='grab';
+      else canvas.defaultCursor='default';
+    });
+
+    canvas.on('mouse:wheel',opt=>{
+      if(mode==='pan'){
+        let z=canvas.getZoom();
+        z*=Math.pow(0.999, opt.e.deltaY);
+        z=Math.min(Math.max(z,0.5),10);
+        canvas.zoomToPoint({x:opt.e.offsetX,y:opt.e.offsetY},z);
+        opt.e.preventDefault();opt.e.stopPropagation();
+      }
+    });
+
+    // Ha visszaváltasz pan-ról, engedélyezd az elemek kijelölését
+    function restoreSelection() {
+      if(mode!=='pan') canvas.selection=true;
+      if(mode!=='pan') canvas.defaultCursor='default';
+    }
+    // Bármely eszközre kattintva visszaáll
+    [drawBtn,lineBtn,rectBtn,textBtn,postitBtn].forEach(b=>b.addEventListener('click',restoreSelection));
+
     // Post-it form
-    form.onsubmit=e=>{e.preventDefault();const header=document.getElementById('header-input').value;const color=document.getElementById('color-input').value;const akad=document.getElementById('akadaly-input').value;const kozg=document.getElementById('kozig-input').value;const hat=document.getElementById('hatarido-input').value;const hely=document.getElementById('helyisegcsoport-input').value;const meg=document.getElementById('megj-input').value;const p=lineStart||{x:canvas.width/2,y:canvas.height/2};const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});const head=new fabric.Text(header,{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});const body=new fabric.Textbox([`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n'),{left:p.x+8,top:p.y+8+head.height+6,width:184,fontSize:12,fill:'#000'});const group=new fabric.Group([rectPt,head,body],{left:p.x,top:p.y,hasBorders:true,hasControls:true});group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};canvas.add(group);postItData.push(group.data);overlay.style.display=modal.style.display='none';updateStats();};
+    form.onsubmit=e=>{
+      e.preventDefault();
+      const header=document.getElementById('header-input').value;
+      const color=document.getElementById('color-input').value;
+      const akad=document.getElementById('akadaly-input').value;
+      const kozg=document.getElementById('kozig-input').value;
+      const hat=document.getElementById('hatarido-input').value;
+      const hely=document.getElementById('helyisegcsoport-input').value;
+      const meg=document.getElementById('megj-input').value;
+      const p=lineStart||{x:canvas.width/2,y:canvas.height/2};
+      const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});
+      const head=new fabric.Text(header,{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});
+      const body=new fabric.Textbox([`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n'),{left:p.x+8,top:p.y+8+head.height+6,width:184,fontSize:12,fill:'#000'});
+      const group=new fabric.Group([rectPt,head,body],{left:p.x,top:p.y,hasBorders:true,hasControls:true});
+      group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};
+      canvas.add(group);
+      postItData.push(group.data);
+      overlay.style.display=modal.style.display='none';
+      updateStats();
+    };
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none';};
+
     // Stats & exports
-    function updateStats(){document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;document.getElementById('stat-count').textContent=postItData.length;const by={};postItData.forEach(d=>by[d.kozig]=(by[d.kozig]||0)+1);const ul=document.getElementById('stat-by-responsible');ul.innerHTML='';Object.entries(by).forEach(([r,c])=>{const li=document.createElement('li');li.textContent=`${r}: ${c}`;ul.appendChild(li);});}
+    function updateStats(){
+      document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;
+      document.getElementById('stat-count').textContent=postItData.length;
+      const by={};
+      postItData.forEach(d=>by[d.kozig]=(by[d.kozig]||0)+1);
+      const ul=document.getElementById('stat-by-responsible');
+      ul.innerHTML='';
+      Object.entries(by).forEach(([r,c])=>{
+        const li=document.createElement('li');
+        li.textContent=`${r}: ${c}`;
+        ul.appendChild(li);
+      });
+    }
     updateStats();
-    exportSummaryBtn.onclick=()=>{const lines=['# Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];postItData.forEach((d,i)=>{lines.push('## '+(i+1)+'. '+d.header);lines.push('- **Akadály:** '+d.akadaly);lines.push('- **Közreműködő:** '+d.kozig);lines.push('- **Határidő:** '+d.hatarido);lines.push('- **Helyiségcsoport:** '+(d.helyisegcsoport||'-'));lines.push('- **Megjegyzés:** '+(d.megjegyzes||'-'));lines.push('');});const blob=new Blob([lines.join('\n')],{type:'text/markdown'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='jegyzokonyv_v'+version+'.md';a.click();URL.revokeObjectURL(url);version++;baseTimestamp=new Date();updateStats();};
-    exportPdfBtn.onclick=()=>{const dataUrl=canvas.toDataURL({format:'png',multiplier:2});const pdf=new jsPDF({unit:'pt',format:[canvas.width,canvas.height]});pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height);pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');};
+
+    exportSummaryBtn.onclick=()=>{
+      const lines=['# Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];
+      postItData.forEach((d,i)=>{
+        lines.push('## '+(i+1)+'. '+d.header);
+        lines.push('- **Akadály:** '+d.akadaly);
+        lines.push('- **Közreműködő:** '+d.kozig);
+        lines.push('- **Határidő:** '+d.hatarido);
+        lines.push('- **Helyiségcsoport:** '+(d.helyisegcsoport||'-'));
+        lines.push('- **Megjegyzés:** '+(d.megjegyzes||'-'));
+        lines.push('');
+      });
+      const blob=new Blob([lines.join('\n')],{type:'text/markdown'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='jegyzokonyv_v'+version+'.md';a.click();URL.revokeObjectURL(url);
+      version++;baseTimestamp=new Date();updateStats();
+    };
+
+    exportPdfBtn.onclick=()=>{
+      const dataUrl=canvas.toDataURL({format:'png',multiplier:2});
+      const pdf=new jsPDF({unit:'pt',format:[canvas.width,canvas.height]});
+      pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height);
+      pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
+    };
+
+    // Megakadályozzuk, hogy pan módban az elemeket lehessen kijelölni/módosítani
+    canvas.on('before:selection:cleared', function(opt) {
+      if(mode==='pan') opt.e.preventDefault();
+    });
+    canvas.on('object:selected', function(opt) {
+      if(mode==='pan') canvas.discardActiveObject();
+    });
+
   </script>
 </body>
 </html>
-
