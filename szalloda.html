@@ -24,7 +24,6 @@
     #modal .buttons { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -73,8 +72,16 @@
   <div id="canvas-container"><canvas id="c"></canvas></div>
   <div id="modal-overlay"></div>
   <div id="modal">
-    <h3>Post-it adatok</h3><form id="postit-form">
-      <!-- form fields -->
+    <h3>Post-it adatok</h3>
+    <form id="postit-form">
+      <label>Fejléc:<input type="text" id="header-input" required></label>
+      <label>Papír szín:<input type="color" id="color-input" value="#ffeb3b" required></label>
+      <label>Akadály leírása:<textarea id="akadaly-input" rows="2" required></textarea></label>
+      <label>Közreműködő:<input type="text" id="kozig-input" required></label>
+      <label>Határidő:<input type="date" id="hatarido-input" required></label>
+      <label>Helyiségcsoport:<input type="text" id="helyisegcsoport-input"></label>
+      <label>Megjegyzés:<textarea id="megj-input" rows="2"></textarea></label>
+      <div class="buttons"><button type="button" id="cancel-btn">Mégsem</button><button type="submit">Mentés</button></div>
     </form>
   </div>
   <script>
@@ -95,30 +102,43 @@
     panBtn.onclick=()=>{mode='pan'; canvas.isDrawingMode=false;};
     colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
     strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
+    // Load PDF
+    document.getElementById('file-input').onchange = e => {
+      const file = e.target.files[0]; if (!file || file.type !== 'application/pdf') return;
+      const reader = new FileReader(); reader.onload = function() {
+        const u8 = new Uint8Array(this.result);
+        pdfjsLib.getDocument({ data: u8 }).promise.then(pdf => pdf.getPage(1).then(page => {
+          const vp = page.getViewport({ scale: 1 });
+          const tmp = document.createElement('canvas'); tmp.width = vp.width; tmp.height = vp.height;
+          page.render({ canvasContext: tmp.getContext('2d'), viewport: vp }).promise.then(() => {
+            const container = document.getElementById('canvas-container');
+            const cw = container.clientWidth, ch = container.clientHeight;
+            const scale = Math.min(cw/tmp.width, ch/tmp.height);
+            canvas.setWidth(tmp.width*scale); canvas.setHeight(tmp.height*scale);
+            fabric.Image.fromURL(tmp.toDataURL(), img => {
+              img.set({ originX:'left', originY:'top' }); img.scale(scale);
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+            });
+          });
+        }));
+      }; reader.readAsArrayBuffer(file);
+    };
     // Canvas events
     canvas.on('mouse:down', opt=>{
       const e=opt.e, p=canvas.getPointer(e);
-      if(mode==='line'){ isLine=true; lineStart=p;
-        currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});
-        canvas.add(currentLine);
-      } else if(mode==='rect'){ isRect=true; rectStart=p;
-        currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});
-        canvas.add(currentRect);
-      }
-      else if(mode==='pan'&&e.button===1){canvas.isDragging=true;canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;}
-      else if(mode==='text'){const txt=prompt('Szöveg:'); if(txt)canvas.add(new fabric.Textbox(txt,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16})); mode='draw'; canvas.isDrawingMode=true;}
-      else if(mode==='draw'&&e.shiftKey){mode='line'; isLine=true; lineStart=p; currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}    });
+      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);} 
+      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);} 
+      else if(mode==='pan'&&e.button===1){canvas.isDragging=true;canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;} 
+      else if(mode==='text'){const txt=prompt('Szöveg:');if(txt)canvas.add(new fabric.Textbox(txt,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));mode='draw';canvas.isDrawingMode=true;} 
+      else if(mode==='draw'&&e.shiftKey){mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}    });
     canvas.on('mouse:move', opt=>{
       const e=opt.e, p=canvas.getPointer(e);
-      if(isLine&&currentLine){ const dx=Math.abs(p.x-lineStart.x),dy=Math.abs(p.y-lineStart.y);
-        if(e.shiftKey){ if(dx>dy) currentLine.set({x2:p.x,y2:lineStart.y}); else currentLine.set({x2:lineStart.x,y2:p.y}); }
-        else currentLine.set({x2:p.x,y2:p.y}); canvas.requestRenderAll(); return; }
-      if(isRect&&currentRect){ const w=p.x-rectStart.x, h=p.y-rectStart.y;
-        currentRect.set({ width:Math.abs(w), height:Math.abs(h), left: w<0 ? p.x : rectStart.x, top: h<0 ? p.y : rectStart.y }); canvas.requestRenderAll(); return; }
+      if(isLine&&currentLine){const dx=Math.abs(p.x-lineStart.x),dy=Math.abs(p.y-lineStart.y);if(e.shiftKey){if(dx>dy)currentLine.set({x2:p.x,y2:lineStart.y});else currentLine.set({x2:lineStart.x,y2:p.y});}else currentLine.set({x2:p.x,y2:p.y});canvas.requestRenderAll();return;} 
+      if(isRect&&currentRect){const w=p.x-rectStart.x,h=p.y-rectStart.y;currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});canvas.requestRenderAll();return;} 
       if(canvas.isDragging){const v=canvas.viewportTransform;v[4]+=e.clientX-canvas.lastPosX;v[5]+=e.clientY-canvas.lastPosY;canvas.renderAll();canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;}    });
-    canvas.on('mouse:up', opt=>{ if(isLine){currentLine.set({selectable:true}); isLine=false; mode='draw'; canvas.isDrawingMode=true;} if(isRect){currentRect.set({selectable:true}); isRect=false; mode='draw'; canvas.isDrawingMode=true;} canvas.isDragging=false; });
+    canvas.on('mouse:up', opt=>{if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;}if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;}canvas.isDragging=false;});
     canvas.on('mouse:wheel', opt=>{const d=opt.e.deltaY;let z=canvas.getZoom()*Math.pow(0.999,d);z=Math.min(Math.max(z,0.5),20);canvas.zoomToPoint({x:opt.e.offsetX,y:opt.e.offsetY},z);opt.e.preventDefault();opt.e.stopPropagation();});
-    // PDF load, Post-it, stats, exports omitted for brevity
+    // Post-it, stats, exports omitted
   </script>
 </body>
 </html>
