@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>1PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>APDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
@@ -268,7 +268,6 @@
     });
 
     // Post-it modal logic
-    let tmpPostItData = null;
     postitBtn.onclick = () => {
       form.reset();
       const tpl = templateSelect.value;
@@ -288,8 +287,8 @@
         'Brand (Accor)': '#4682B4',
         'Üzemeltető (Demény Gábor)': '#66CDAA',
         'Üzemeltető (Balogh Károly)': '#D2691E',
-        'Üres 1': '#FFE4B5','Üres 2':'#E6E6FA','Üres 3':'#F0E68C','Üres 4':'#AFEEEE','Üres 5':'#FFDAB9',
-        'Egyéni':'#FFEB3B'
+        'Üres 1': '#FFE4B5', 'Üres 2': '#E6E6FA', 'Üres 3': '#F0E68C', 'Üres 4': '#AFEEEE', 'Üres 5': '#FFDAB9',
+        'Egyéni': '#FFEB3B'
       };
       document.getElementById('color-input').value = cmap[tpl] || '#ffeb3b';
       overlay.style.display = modal.style.display = 'block';
@@ -297,27 +296,6 @@
 
     cancelBtn.onclick = () => {
       overlay.style.display = modal.style.display = 'none';
-      addingPostIt = false;
-      tmpPostItData = null;
-    };
-
-    form.onsubmit = e => {
-      e.preventDefault();
-      // collect form data and close modal
-      tmpPostItData = {
-        header: document.getElementById('header-input').value,
-        color: document.getElementById('color-input').value,
-        akadaly: document.getElementById('akadaly-input').value,
-        kozig: document.getElementById('kozig-input').value,
-        hatarido: document.getElementById('hatarido-input').value,
-        helyisegcsoport: document.getElementById('helyisegcsoport-input').value,
-        megjegyzes: document.getElementById('megj-input').value
-      };
-      overlay.style.display = modal.style.display = 'none';
-      addingPostIt = true;
-    };
-      overlay.style.display = modal.style.display = 'none';
-      addingPostIt = true;
     };
 
     form.onsubmit = e => {
