@@ -92,9 +92,36 @@
     panBtn.onclick = () => { mode = 'pan'; canvas.isDrawingMode = false; addingText = addingPostIt = false; };
     textBtn.onclick = () => { mode = 'text'; addingText = !addingText; addingPostIt = false; canvas.isDrawingMode = false; };
     // Initiate Post-it flow: show form first
+    // Initiate Post-it flow: show form first and pre-fill from template
     postitBtn.onclick = () => {
       // Reset form
       form.reset();
+      // Pre-fill header and color based on selected template
+      const template = templateSelect.value;
+      document.getElementById('header-input').value = template;
+      const colorMap = {
+        'Megrendelő pénzügyi': '#FFD700',
+        'Megrendelő műszaki': '#ADFF2F',
+        'Kivitelező építész pályáztatás': '#87CEEB',
+        'Kivitelező gépész pályáztatás': '#FF69B4',
+        'Kivitelező elektromos pályáztatás': '#FFA500',
+        'Kivitelező építész műszaki': '#20B2AA',
+        'Kivitelező gépész műszaki': '#9370DB',
+        'Kivitelező elektromos műszaki': '#FF6347',
+        'Belsőépítész tervező': '#40E0D0',
+        'Elektromos tervező': '#DB7093',
+        'Tűzvédelem': '#DC143C',
+        'Brand (Accor)': '#4682B4',
+        'Üzemeltető (Demény Gábor)': '#66CDAA',
+        'Üzemeltető (Balogh Károly)': '#D2691E',
+        'Üres 1': '#FFE4B5',
+        'Üres 2': '#E6E6FA',
+        'Üres 3': '#F0E68C',
+        'Üres 4': '#AFEEEE',
+        'Üres 5': '#FFDAB9',
+        'Egyéni': '#FFEB3B'
+      };
+      document.getElementById('color-input').value = colorMap[template] || '#ffeb3b';
       overlay.style.display = modal.style.display = 'block';
     };
     colorPicker.onchange = e => canvas.freeDrawingBrush.color = e.target.value;
@@ -186,4 +213,5 @@
   </script>
 </body>
 </html>
+
 
