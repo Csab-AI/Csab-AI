@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>11PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>13PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -35,6 +35,7 @@
     <button id="draw-btn">Szabadkézi</button>
     <button id="line-btn">Vonal</button>
     <button id="rect-btn">Téglalap</button>
+    <button id="select-btn">Kijelölés</button>
     <button id="pan-btn">Mozgatás</button>
     <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
     <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
@@ -106,6 +107,7 @@
     const drawBtn=document.getElementById('draw-btn');
     const lineBtn=document.getElementById('line-btn');
     const rectBtn=document.getElementById('rect-btn');
+    const selectBtn=document.getElementById('select-btn');
     const panBtn=document.getElementById('pan-btn');
     const textBtn=document.getElementById('text-btn');
     const postitBtn=document.getElementById('postit-btn');
@@ -121,21 +123,17 @@
 
     // Helper: button highlight
     function setActiveButton(btn) {
-      [drawBtn,lineBtn,rectBtn,panBtn,textBtn,postitBtn].forEach(b=>b.classList.remove('active'));
+      [drawBtn,lineBtn,rectBtn,selectBtn,panBtn,textBtn,postitBtn].forEach(b=>b.classList.remove('active'));
       if(btn) btn.classList.add('active');
     }
 
     // Mode toggles
-    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);canvas.selection=true;canvas.defaultCursor='default';};
-    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;setActiveButton(lineBtn);canvas.selection=true;canvas.defaultCursor='default';};
-    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;setActiveButton(rectBtn);canvas.selection=true;canvas.defaultCursor='default';};
-    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;setActiveButton(textBtn);canvas.selection=true;canvas.defaultCursor='default';};
-    panBtn.onclick=()=>{
-      mode='pan';canvas.isDrawingMode=false;setActiveButton(panBtn);
-      canvas.selection=false;
-      canvas.defaultCursor='grab';
-      canvas.discardActiveObject();
-    };
+    drawBtn.onclick=()=>{setMode('draw')};
+    lineBtn.onclick=()=>{setMode('line')};
+    rectBtn.onclick=()=>{setMode('rect')};
+    selectBtn.onclick=()=>{setMode('select')};
+    panBtn.onclick=()=>{setMode('pan')};
+    textBtn.onclick=()=>{setMode('text')};
     postitBtn.onclick=()=>{
       form.reset();
       const tpl=templateSelect.value;
@@ -163,8 +161,48 @@
       form.setAttribute('data-edit', '');
     };
 
-    // Színes gombok
-    setActiveButton(drawBtn);
+    // Mode beállítások
+    function setMode(m) {
+      mode = m;
+      setActiveButton(
+        m==='draw'?drawBtn:
+        m==='line'?lineBtn:
+        m==='rect'?rectBtn:
+        m==='select'?selectBtn:
+        m==='pan'?panBtn:
+        m==='text'?textBtn:
+        m==='postit'?postitBtn:null
+      );
+      // Canvas paraméterek
+      canvas.isDrawingMode = (mode==='draw');
+      if(mode==='select') {
+        canvas.selection = true;
+        canvas.defaultCursor = 'default';
+        setAllSelectable(true);
+      } else if(mode==='pan') {
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+        setAllSelectable(false);
+        canvas.discardActiveObject();
+      } else {
+        canvas.selection = false;
+        canvas.defaultCursor = 'default';
+        setAllSelectable(false);
+        canvas.discardActiveObject();
+      }
+    }
+    setMode('draw'); // Alapértelmezett
+
+    // Segédfüggvény: minden objektum kijelölhetősége
+    function setAllSelectable(val) {
+      canvas.getObjects().forEach(obj=>{
+        // A postit group, a vonalak, rect stb. mind legyen selectable
+        if(obj.type==='group' || obj.type==='rect' || obj.type==='line' || obj.type==='textbox' || obj.type==='text') {
+          obj.selectable = val;
+          obj.evented = val;
+        }
+      });
+    }
 
     colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
     strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
@@ -198,21 +236,8 @@
     canvas.on('mouse:down',opt=>{
       const e=opt.e, p=canvas.getPointer(e);
 
-      // PAN MÓDBAN JOBBGOMBOS ELEM KIJELÖLÉS
-      if(mode==='pan' && e.button===2) {
-        const target = canvas.findTarget(e, true);
-        if(target) {
-          canvas.setActiveObject(target);
-          canvas.selection=true;
-          editSingleObjectMode=true;
-          canvas.defaultCursor='move';
-        }
-        e.preventDefault();
-        return;
-      }
-
       // PAN MÓDBAN BAL GOMB DRAG
-      if(mode==='pan' && e.button===0 && !editSingleObjectMode) {
+      if(mode==='pan' && e.button===0) {
         isDragging=true;
         lastPosX=e.clientX;
         lastPosY=e.clientY;
@@ -220,15 +245,16 @@
         canvas.discardActiveObject();
       }
 
-      if(editSingleObjectMode) return;
+      // Rajzeszközök
       if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
       else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
       else if(mode==='text'){
         const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));
-        mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);canvas.selection=true;canvas.defaultCursor='default';
+        setMode('draw');
       }
       else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){
-        mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
+        setMode('line');
+        isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
       }
     });
 
@@ -248,7 +274,7 @@
         currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});
         canvas.requestRenderAll();return;
       }
-      if(mode==='pan' && isDragging && !editSingleObjectMode){
+      if(mode==='pan' && isDragging){
         const v=canvas.viewportTransform;
         v[4]+=e.clientX-lastPosX;
         v[5]+=e.clientY-lastPosY;
@@ -258,15 +284,15 @@
     });
 
     canvas.on('mouse:up',opt=>{
-      if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
-      if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
+      if(isLine){currentLine.set({selectable:true});isLine=false;setMode('draw');}
+      if(isRect){currentRect.set({selectable:true});isRect=false;setMode('draw');}
       isDragging=false;
-      if(mode==='pan' && !editSingleObjectMode) canvas.defaultCursor='grab';
+      if(mode==='pan') canvas.defaultCursor='grab';
       else canvas.defaultCursor='default';
     });
 
     canvas.on('mouse:wheel',opt=>{
-      if(mode==='pan' && !editSingleObjectMode){
+      if(mode==='pan'){
         let z=canvas.getZoom();
         z*=Math.pow(0.999, opt.e.deltaY);
         z=Math.min(Math.max(z,0.5),10);
@@ -275,45 +301,7 @@
       }
     });
 
-    function restoreSelection() {
-      if(mode!=='pan') {
-        canvas.selection=true;
-        canvas.defaultCursor='default';
-        editSingleObjectMode = false;
-      }
-    }
-    [drawBtn,lineBtn,rectBtn,textBtn,postitBtn].forEach(b=>b.addEventListener('click',restoreSelection));
-
-    canvas.on('before:selection:cleared', function(opt) {
-      if(mode==='pan' && editSingleObjectMode) {
-        editSingleObjectMode = false;
-        canvas.selection = false;
-        canvas.defaultCursor = 'grab';
-      }
-    });
-    document.addEventListener('keydown', function(e){
-      if(e.key==='Escape' && editSingleObjectMode) {
-        canvas.discardActiveObject();
-        editSingleObjectMode = false;
-        canvas.selection = false;
-        canvas.defaultCursor = 'grab';
-        canvas.requestRenderAll();
-      }
-    });
-    canvas.on('selection:cleared', function(opt) {
-      if(mode==='pan' && editSingleObjectMode) {
-        editSingleObjectMode = false;
-        canvas.selection = false;
-        canvas.defaultCursor = 'grab';
-        canvas.requestRenderAll();
-      }
-    });
-    document.getElementById('c').addEventListener('contextmenu',function(e){
-      if(mode==='pan') e.preventDefault();
-    });
-
-    // --- POST-IT szerkeszthetőség bármikor ---
-    // Mozgatható, átméretezhető: az összes postit group elemet kijelölhetővé tesszük
+    // --- POST-IT szerkeszthetőség dupla klikkel ---
     function makeGroupInteractive(group) {
       group.set({
         hasBorders: true,
@@ -323,12 +311,10 @@
         selectable: true,
         evented: true
       });
-      group.on('mousedblclick', function () {
-        openEditPostitModal(group);
-      });
-      // vagy fabric.js 5.x alatt:
+      // fabric.js 5.x double click workaround:
       group.on('mousedown', function (opt) {
-        if (opt.e && opt.e.detail === 2) { // double click
+        if (mode!=='select') return;
+        if (opt.e && opt.e.detail === 2) {
           openEditPostitModal(group);
         }
       });
@@ -338,7 +324,6 @@
     let editingGroup = null;
     function openEditPostitModal(group) {
       editingGroup = group;
-      // Töltse be az adatokat a formba
       document.getElementById('header-input').value = group.data.header || "";
       document.getElementById('color-input').value = group.item(0).get('fill');
       document.getElementById('akadaly-input').value = group.data.akadaly || "";
@@ -374,7 +359,6 @@
         editingGroup.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         editingGroup.setCoords();
         canvas.requestRenderAll();
-        // Frissítsük a postItData tömböt is
         let idx = postItData.findIndex(d=>d===editingGroup.data);
         if(idx>-1) postItData[idx]=editingGroup.data;
         editingGroup = null;
@@ -437,7 +421,6 @@
     };
 
     // Új post-it létrehozásakor legyen interaktív!
-    // (Meglévők retroaktívan is azzá válnak!)
     canvas.on('object:added', function(opt){
       if(opt && opt.target && opt.target.type==='group') makeGroupInteractive(opt.target);
     });
@@ -445,8 +428,13 @@
     // Első renderelés előtt: ha már vannak group-ok (lehet hogy visszatöltötted), tedd interaktívvá!
     canvas.getObjects('group').forEach(makeGroupInteractive);
 
+    // Context menu tiltása pan módban
+    document.getElementById('c').addEventListener('contextmenu',function(e){
+      if(mode==='pan') e.preventDefault();
+    });
   </script>
 </body>
 </html>
+
 
 
