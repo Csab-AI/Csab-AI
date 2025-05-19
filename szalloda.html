@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>01PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -106,7 +106,30 @@
     // Common save
     function saveAll(){/*no auto*/}
     // PDF load only background
-    refs.fileInput.onchange=e=>{/* as before */};
+    refs.fileInput.onchange = e => {
+      const f = e.target.files[0];
+      if (!f || f.type !== 'application/pdf') return;
+      const reader = new FileReader();
+      reader.onload = function() {
+        const u8 = new Uint8Array(this.result);
+        pdfjsLib.getDocument({ data: u8 }).promise.then(pdf => pdf.getPage(1).then(page => {
+          const vp = page.getViewport({ scale: 1 });
+          const tmp = document.createElement('canvas'); tmp.width = vp.width; tmp.height = vp.height;
+          page.render({ canvasContext: tmp.getContext('2d'), viewport: vp }).promise.then(() => {
+            const scale = Math.min(container.clientWidth/tmp.width, container.clientHeight/tmp.height);
+            canvas.setWidth(tmp.width * scale);
+            canvas.setHeight(tmp.height * scale);
+            fabric.Image.fromURL(tmp.toDataURL(), img => {
+              img.set({ originX: 'left', originY: 'top', selectable: false });
+              img.scale(scale);
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+            });
+            saveAll();
+          });
+        }));
+      };
+      reader.readAsArrayBuffer(f);
+    };
     // Other canvas and UI event handlers as before, call saveAll() on finalize
     updateStats();refreshSessionList();
   </script>
