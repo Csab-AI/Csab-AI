@@ -2,13 +2,14 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>2PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>3PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
     #toolbar { position:fixed; top:0; left:0; right:200px; background:#f4f4f4; padding:8px; z-index:300;
       display:flex; align-items:center; gap:8px; overflow-x:auto; }
     #toolbar button, #toolbar input, #toolbar label, #toolbar select { padding:4px; }
+    #toolbar button.active { background:#ddd; }
     #stats-panel { position:fixed; top:0; right:0; width:200px; bottom:0; background:#fff;
       border-left:1px solid #ccc; padding:8px; font-size:12px; overflow-y:auto; z-index:300; }
     #canvas-container { position:absolute; top:48px; left:0; right:200px; bottom:0; z-index:100; }
@@ -35,6 +36,7 @@
     <button id="line-btn">Vonal</button>
     <button id="rect-btn">Téglalap</button>
     <button id="pan-btn">Mozgatás</button>
+    <button id="undo-btn">Visszavonás</button>
     <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
     <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
     <button id="text-btn">Felirat</button>
@@ -94,109 +96,143 @@
     let version = 1;
     let baseTimestamp = new Date();
     const canvas = new fabric.Canvas('c', { selection:true });
-    // Drawing state
+    const container = document.getElementById('canvas-container');
+    canvas.setWidth(container.clientWidth);
+    canvas.setHeight(container.clientHeight);
+
+    // State
     let mode='draw', isLine=false, lineStart=null, currentLine=null;
     let isRect=false, rectStart=null, currentRect=null;
-    canvas.isDrawingMode=true;
-    canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
+
     // UI refs
-    const fileInput=document.getElementById('file-input');
-    const drawBtn=document.getElementById('draw-btn');
-    const lineBtn=document.getElementById('line-btn');
-    const rectBtn=document.getElementById('rect-btn');
-    const panBtn=document.getElementById('pan-btn');
-    const textBtn=document.getElementById('text-btn');
-    const postitBtn=document.getElementById('postit-btn');
-    const colorPicker=document.getElementById('color-picker');
-    const strokeWidth=document.getElementById('stroke-width');
-    const templateSelect=document.getElementById('template-select');
-    const exportPdfBtn=document.getElementById('export-pdf-btn');
-    const exportSummaryBtn=document.getElementById('export-summary-btn');
-    const overlay=document.getElementById('modal-overlay');
-    const modal=document.getElementById('modal');
-    const form=document.getElementById('postit-form');
-    const cancelBtn=document.getElementById('cancel-btn');
+    const fileInput    = document.getElementById('file-input');
+    const drawBtn      = document.getElementById('draw-btn');
+    const lineBtn      = document.getElementById('line-btn');
+    const rectBtn      = document.getElementById('rect-btn');
+    const panBtn       = document.getElementById('pan-btn');
+    const undoBtn      = document.getElementById('undo-btn');
+    const colorPicker  = document.getElementById('color-picker');
+    const strokeWidth  = document.getElementById('stroke-width');
+    const textBtn      = document.getElementById('text-btn');
+    const postitBtn    = document.getElementById('postit-btn');
+    const templateSelect = document.getElementById('template-select');
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+    const exportSummaryBtn = document.getElementById('export-summary-btn');
+    const overlay      = document.getElementById('modal-overlay');
+    const modal        = document.getElementById('modal');
+    const form         = document.getElementById('postit-form');
+    const cancelBtn    = document.getElementById('cancel-btn');
+
+    // Brush init
+    canvas.isDrawingMode=true;
+    canvas.freeDrawingBrush.color='#ff0000';
+    canvas.freeDrawingBrush.width=2;
+
     // Mode toggles
-    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;};
-    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;};
-    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;};
-    panBtn.onclick=()=>{mode='pan';canvas.isDrawingMode=false;};
-    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;};
-    postitBtn.onclick=()=>{
-      form.reset();
-      // prefill
-      const tpl=templateSelect.value;
-      document.getElementById('header-input').value=tpl;
-      const cmap={
-        'Megrendelő pénzügyi':'#FFD700',
-        'Megrendelő műszaki':'#ADFF2F',
-        'Kivitelező építész pályáztatás':'#87CEEB',
-        'Kivitelező gépész pályáztatás':'#FF69B4',
-        'Kivitelező elektromos pályáztatás':'#FFA500',
-        'Kivitelező építész műszaki':'#20B2AA',
-        'Kivitelező gépész műszaki':'#9370DB',
-        'Kivitelező elektromos műszaki':'#FF6347',
-        'Belsőépítész tervező':'#40E0D0',
-        'Elektromos tervező':'#DB7093',
-        'Tűzvédelem':'#DC143C',
-        'Brand (Accor)':'#4682B4',
-        'Üzemeltető (Demény Gábor)':'#66CDAA',
-        'Üzemeltető (Balogh Károly)':'#D2691E',
-        'Üres 1':'#FFE4B5','Üres 2':'#E6E6FA','Üres 3':'#F0E68C','Üres 4':'#AFEEEE','Üres 5':'#FFDAB9',
-        'Egyéni':'#FFEB3B'
+    drawBtn.onclick = ()=>{ mode='draw'; canvas.isDrawingMode=true; };
+    lineBtn.onclick = ()=>{ mode='line'; canvas.isDrawingMode=false; };
+    rectBtn.onclick = ()=>{ mode='rect'; canvas.isDrawingMode=false; };
+    panBtn.onclick  = ()=>{ mode='pan'; canvas.isDrawingMode=false; };
+    textBtn.onclick = ()=>{ mode='text'; canvas.isDrawingMode=false; };
+
+    // Undo: törli az utolsó Fabric objektumot
+    undoBtn.onclick = ()=> {
+      const objs = canvas.getObjects();
+      if (objs.length) {
+        canvas.remove(objs[objs.length-1]);
+        canvas.renderAll();
+      }
+    };
+
+    colorPicker.onchange = e => canvas.freeDrawingBrush.color = e.target.value;
+    strokeWidth.onchange = e => canvas.freeDrawingBrush.width = parseInt(e.target.value,10)||1;
+
+    // PDF betöltés (ahogy eddig)
+    fileInput.onchange = e => {
+      const f = e.target.files[0];
+      if(!f||f.type!=='application/pdf') return;
+      const reader = new FileReader();
+      reader.onload = function(){
+        const u8 = new Uint8Array(this.result);
+        pdfjsLib.getDocument({data:u8}).promise
+          .then(pdf=>pdf.getPage(1))
+          .then(page=>{
+            const vp = page.getViewport({scale:1});
+            const tmp = document.createElement('canvas');
+            tmp.width = vp.width; tmp.height = vp.height;
+            return page.render({canvasContext: tmp.getContext('2d'), viewport: vp})
+                       .promise.then(()=>tmp);
+          })
+          .then(tmp => {
+            const scale = Math.min(container.clientWidth/tmp.width, container.clientHeight/tmp.height);
+            canvas.setWidth(tmp.width*scale);
+            canvas.setHeight(tmp.height*scale);
+            fabric.Image.fromURL(tmp.toDataURL(), img=>{
+              img.set({originX:'left',originY:'top', selectable:false});
+              img.scale(scale);
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+            });
+          })
+          .catch(console.error);
       };
-      document.getElementById('color-input').value=cmap[tpl]||'#ffeb3b';
-      overlay.style.display=modal.style.display='block';
+      reader.readAsArrayBuffer(f);
     };
-    colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
-    strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
-    // Load PDF
-    fileInput.onchange=e=>{
-      const f=e.target.files[0]; if(!f||f.type!=='application/pdf')return;
-      const r=new FileReader();r.onload=function(){
-        const u8=new Uint8Array(this.result);
-        pdfjsLib.getDocument({data:u8}).promise.then(pdf=>pdf.getPage(1).then(page=>{
-          const vp=page.getViewport({scale:1});
-          const tmp=document.createElement('canvas');tmp.width=vp.width;tmp.height=vp.height;
-          page.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise.then(()=>{
-            const c=document.getElementById('canvas-container');
-            const scale=Math.min(c.clientWidth/tmp.width,c.clientHeight/tmp.height);
-            canvas.setWidth(tmp.width*scale);canvas.setHeight(tmp.height*scale);
-            fabric.Image.fromURL(tmp.toDataURL(),img=>{img.set({originX:'left',originY:'top'});img.scale(scale);canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas));});
-          });
-        }));
-      };r.readAsArrayBuffer(f);
-    };
-    // Canvas events
-    canvas.on('mouse:down',opt=>{
-      const e=opt.e,p=canvas.getPointer(e);
-      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);} 
-      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);} 
-      else if(mode==='pan'&&e.button===1){canvas.isDragging=true;canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;} 
-      else if(mode==='text'){const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));mode='draw';canvas.isDrawingMode=true;} 
-      else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}    });
-    canvas.on('mouse:move',opt=>{
-      const e=opt.e,p=canvas.getPointer(e);
-      if(isLine&&currentLine){const dx=Math.abs(p.x-lineStart.x),dy=Math.abs(p.y-lineStart.y);
-        if(e.shiftKey){if(dx>dy)currentLine.set({x2:p.x,y2:lineStart.y});else currentLine.set({x2:lineStart.x,y2:p.y});}
-        else currentLine.set({x2:p.x,y2:p.y});canvas.requestRenderAll();return;}
-      if(isRect&&currentRect){const w=p.x-rectStart.x,h=p.y-rectStart.y;
-        currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});canvas.requestRenderAll();return;}
-      if(canvas.isDragging){const v=canvas.viewportTransform;v[4]+=e.clientX-canvas.lastPosX;v[5]+=e.clientY-canvas.lastPosY;canvas.renderAll();canvas.lastPosX=e.clientX;canvas.lastPosY=e.clientY;}    });
-    canvas.on('mouse:up',opt=>{
-      if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;}
-      if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;}
-      canvas.isDragging=false;
+
+    // Canvas események (rajzolás, vonal, téglalap, pan, text)
+    canvas.on('mouse:down', opt=>{
+      const e = opt.e, p = canvas.getPointer(e);
+      if(mode==='pan'){ canvas.isDragging=true; canvas.selection=false; return; }
+      if(mode==='line'){ isLine=true; lineStart=p; currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{
+        stroke:canvas.freeDrawingBrush.color, strokeWidth:canvas.freeDrawingBrush.width, selectable:false
+      }); canvas.add(currentLine); }
+      else if(mode==='rect'){ isRect=true; rectStart=p; currentRect=new fabric.Rect({
+        left:p.x, top:p.y, width:0, height:0, fill:'transparent',
+        stroke:canvas.freeDrawingBrush.color, strokeWidth:canvas.freeDrawingBrush.width, selectable:false
+      }); canvas.add(currentRect); }
+      else if(mode==='text'){ const t=prompt('Szöveg:'); if(t) canvas.add(new fabric.Textbox(t,{
+        left:p.x, top:p.y, fill:canvas.freeDrawingBrush.color, fontSize:16
+      })); mode='draw'; canvas.isDrawingMode=true; }
     });
-    canvas.on('mouse:wheel',opt=>{const d=opt.e.deltaY;let z=canvas.getZoom()*Math.pow(0.999,d);z=Math.min(Math.max(z,0.5),20);canvas.zoomToPoint({x:opt.e.offsetX,y:opt.е.offsetY},z);opt.e.preventDefault();opt.e.stopPropagation();});
-    // Post-it form
-    form.onsubmit=e=>{e.preventDefault();const header=document.getElementById('header-input').value;const color=document.getElementById('color-input').value;const akad=document.getElementById('akadaly-input').value;const kozg=document.getElementById('kozig-input').value;const hat=document.getElementById('hatarido-input').value;const hely=document.getElementById('helyisegcsoport-input').value;const meg=document.getElementById('megj-input').value;const p=lineStart||{x:canvas.width/2,y:canvas.height/2};const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});const head=new fabric.Text(header,{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});const body=new fabric.Textbox([`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n'),{left:p.x+8,top:p.y+8+head.height+6,width:184,fontSize:12,fill:'#000'});const group=new fabric.Group([rectPt,head,body],{left:p.x,top:p.y,hasBorders:true,hasControls:true});group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};canvas.add(group);postItData.push(group.data);overlay.style.display=modal.style.display='none';updateStats();};
-    cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none';};
-    // Stats & exports
-    function updateStats(){document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;document.getElementById('stat-count').textContent=postItData.length;const by={};postItData.forEach(d=>by[d.kozig]=(by[d.kozig]||0)+1);const ul=document.getElementById('stat-by-responsible');ul.innerHTML='';Object.entries(by).forEach(([r,c])=>{const li=document.createElement('li');li.textContent=`${r}: ${c}`;ul.appendChild(li);});}
-    updateStats();
-    exportSummaryBtn.onclick=()=>{const lines=['# Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];postItData.forEach((d,i)=>{lines.push('## '+(i+1)+'. '+d.header);lines.push('- **Akadály:** '+d.akadaly);lines.push('- **Közreműködő:** '+d.kozig);lines.push('- **Határidő:** '+d.hatarido);lines.push('- **Helyiségcsoport:** '+(d.helyisegcsoport||'-'));lines.push('- **Megjegyzés:** '+(d.megjegyzes||'-'));lines.push('');});const blob=new Blob([lines.join('\n')],{type:'text/markdown'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='jegyzokonyv_v'+version+'.md';a.click();URL.revokeObjectURL(url);version++;baseTimestamp=new Date();updateStats();};
-    exportPdfBtn.onclick=()=>{const dataUrl=canvas.toDataURL({format:'png',multiplier:2});const pdf=new jsPDF({unit:'pt',format:[canvas.width,canvas.height]});pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height);pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');};
+
+    canvas.on('mouse:move', opt=>{
+      const e=opt.e, p=canvas.getPointer(e);
+      if(canvas.isDragging){ const v=canvas.viewportTransform;
+        v[4]+= e.clientX - canvas.lastPosX;
+        v[5]+= e.clientY - canvas.lastPosY;
+        canvas.renderAll();
+        canvas.lastPosX = e.clientX;
+        canvas.lastPosY = e.clientY;
+        return;
+      }
+      if(isLine&&currentLine){ currentLine.set({ x2:p.x, y2:p.y }); canvas.requestRenderAll(); }
+      if(isRect&&currentRect){
+        const w=p.x-rectStart.x, h=p.y-rectStart.y;
+        currentRect.set({
+          width:Math.abs(w), height:Math.abs(h),
+          left: w<0?p.x:rectStart.x, top: h<0?p.y:rectStart.y
+        });
+        canvas.requestRenderAll();
+      }
+    });
+
+    canvas.on('mouse:up', ()=>{
+      if(canvas.isDragging){ canvas.isDragging=false; canvas.selection=true; }
+      if(isLine){ currentLine.set({selectable:true}); isLine=false; }
+      if(isRect){ currentRect.set({selectable:true}); isRect=false; }
+    });
+
+    canvas.on('mouse:wheel', opt=>{
+      if(mode!=='pan') return;
+      const d=opt.e.deltaY;
+      let z=canvas.getZoom()*Math.pow(0.999,d);
+      z=Math.min(Math.max(z,0.5),20);
+      canvas.zoomToPoint({x:opt.e.offsetX,y:opt.e.offsetY},z);
+      opt.e.preventDefault(); opt.e.stopPropagation();
+    });
+
+    // Post-it modal + export + stats ...
+    // (ezek maradnak, ahogy voltak)
+
   </script>
 </body>
 </html>
