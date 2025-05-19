@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>1PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
@@ -297,11 +297,13 @@
 
     cancelBtn.onclick = () => {
       overlay.style.display = modal.style.display = 'none';
+      addingPostIt = false;
+      tmpPostItData = null;
     };
 
     form.onsubmit = e => {
       e.preventDefault();
-      // collect form data
+      // collect form data and close modal
       tmpPostItData = {
         header: document.getElementById('header-input').value,
         color: document.getElementById('color-input').value,
@@ -311,6 +313,9 @@
         helyisegcsoport: document.getElementById('helyisegcsoport-input').value,
         megjegyzes: document.getElementById('megj-input').value
       };
+      overlay.style.display = modal.style.display = 'none';
+      addingPostIt = true;
+    };
       overlay.style.display = modal.style.display = 'none';
       addingPostIt = true;
     };
