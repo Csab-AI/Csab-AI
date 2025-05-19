@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>10PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -108,35 +108,14 @@
   </div>
   <script>
     const { jsPDF } = window.jspdf;
-    const postItData = [];
+    let postItData = [];
     let version = 1;
     let baseTimestamp = new Date();
     const canvas = new fabric.Canvas('c', { selection:true });
-    // Drawing state
     let mode='draw', isLine=false, lineStart=null, currentLine=null;
     let isRect=false, rectStart=null, currentRect=null;
     canvas.isDrawingMode=true;
     canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
-
-    // Undo stack
-    const undoStack = [];
-    function saveUndo() {
-      // limit stack size
-      if(undoStack.length>40) undoStack.shift();
-      undoStack.push(canvas.toDatalessJSON(['data']));
-    }
-    function undo() {
-      if(undoStack.length===0) return;
-      const prev = undoStack.pop();
-      canvas.loadFromJSON(prev, function() {
-        canvas.renderAll();
-        // postItData sync
-        postItData.length=0;
-        canvas.getObjects('group').forEach(g=>g.data && postItData.push(g.data));
-        canvas.getObjects('group').forEach(makeGroupInteractive);
-        updateStats();
-      });
-    }
 
     // UI refs
     const fileInput=document.getElementById('file-input');
@@ -163,13 +142,11 @@
     const saveList=document.getElementById('save-list');
     const closeSaveLoadBtn=document.getElementById('close-save-load-btn');
 
-    // Helper: button highlight
     function setActiveButton(btn) {
       [drawBtn,lineBtn,rectBtn,selectBtn,panBtn,textBtn,postitBtn].forEach(b=>b.classList.remove('active'));
       if(btn) btn.classList.add('active');
     }
 
-    // Mode toggles
     drawBtn.onclick=()=>{setMode('draw')};
     lineBtn.onclick=()=>{setMode('line')};
     rectBtn.onclick=()=>{setMode('rect')};
@@ -203,7 +180,6 @@
       form.setAttribute('data-edit', '');
     };
 
-    // Mode beállítások
     function setMode(m) {
       mode = m;
       setActiveButton(
@@ -234,7 +210,6 @@
     }
     setMode('draw');
 
-    // Segédfüggvény: minden objektum kijelölhetősége
     function setAllSelectable(val) {
       canvas.getObjects().forEach(obj=>{
         if(obj.type==='group' || obj.type==='rect' || obj.type==='line' || obj.type==='textbox' || obj.type==='text') {
@@ -247,7 +222,6 @@
     colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
     strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
 
-    // PDF beolvasás
     fileInput.onchange=e=>{
       const f=e.target.files[0]; if(!f||f.type!=='application/pdf')return;
       const r=new FileReader();r.onload=function(){
@@ -268,10 +242,8 @@
       };r.readAsArrayBuffer(f);
     };
 
-    // Pan & Zoom state
     let isDragging=false, lastPosX=0, lastPosY=0;
 
-    // Canvas events
     canvas.on('mouse:down',opt=>{
       const e=opt.e, p=canvas.getPointer(e);
       if(mode==='pan' && e.button===0) {
@@ -281,15 +253,14 @@
         canvas.defaultCursor='grabbing';
         canvas.discardActiveObject();
       }
-      if(mode==='line'){saveUndo();isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
-      else if(mode==='rect'){saveUndo();isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
+      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
+      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
       else if(mode==='text'){
-        const t=prompt('Szöveg:');if(t){saveUndo();canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));}
+        const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));
         setMode('draw');
       }
       else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){
         setMode('line');
-        saveUndo();
         isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
       }
     });
@@ -337,7 +308,6 @@
       }
     });
 
-    // --- POST-IT szerkeszthetőség dupla klikkel ---
     function makeGroupInteractive(group) {
       group.set({
         hasBorders: true,
@@ -355,7 +325,6 @@
       });
     }
 
-    // --- Post-it modal szerkesztés ---
     let editingGroup = null;
     function openEditPostitModal(group) {
       editingGroup = group;
@@ -381,7 +350,6 @@
       const meg=document.getElementById('megj-input').value;
 
       if(form.getAttribute('data-edit') === 'true' && editingGroup) {
-        saveUndo();
         editingGroup.item(0).set('fill', color);
         editingGroup.item(1).set('text', header);
         editingGroup.item(2).set('text', [
@@ -394,11 +362,10 @@
         editingGroup.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         editingGroup.setCoords();
         canvas.requestRenderAll();
-        let idx = postItData.findIndex(d=>d===editingGroup.data);
-        if(idx>-1) postItData[idx]=editingGroup.data;
+        // postItData szinkron
+        postItData = canvas.getObjects('group').map(g=>g.data);
         editingGroup = null;
       } else {
-        saveUndo();
         const p=lineStart||{x:canvas.width/2,y:canvas.height/2};
         const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});
         const head=new fabric.Text(header,{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});
@@ -407,7 +374,7 @@
         group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};
         makeGroupInteractive(group);
         canvas.add(group);
-        postItData.push(group.data);
+        postItData = canvas.getObjects('group').map(g=>g.data);
       }
       overlay.style.display=modal.style.display='none';
       form.removeAttribute('data-edit');
@@ -415,13 +382,6 @@
     };
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none'; form.removeAttribute('data-edit'); editingGroup=null;};
 
-    // Undo gomb
-    undoBtn.onclick=()=>{undo();};
-    document.addEventListener('keydown',function(e){
-      if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undo(); }
-    });
-
-    // Stat, export
     function updateStats(){
       document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;
       document.getElementById('stat-count').textContent=postItData.length;
@@ -461,7 +421,25 @@
       pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
     };
 
-    // Mentés/betöltés funkció (localStorage)
+    // Undo = utoljára hozzáadott objektum törlése (nem teljes Undo stack)
+    undoBtn.onclick=()=>{
+      // ne töröld a hátteret!
+      const objs = canvas.getObjects();
+      if(objs.length > 0){
+        // Legutóbbi utolsó objektum, de ha háttérkép, azt nem!
+        let last = objs[objs.length-1];
+        if(last === canvas.backgroundImage && objs.length>1) last = objs[objs.length-2];
+        canvas.remove(last);
+        postItData = canvas.getObjects('group').map(g=>g.data);
+        updateStats();
+        canvas.requestRenderAll();
+      }
+    };
+
+    document.addEventListener('keydown',function(e){
+      if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undoBtn.onclick(); }
+    });
+
     saveBtn.onclick=function(){
       const now=new Date();
       const key="pdfrajz_"+now.toISOString().replace(/:/g,'');
@@ -474,15 +452,14 @@
       alert("Állás mentve: " + saveObj.timestamp);
     };
     loadBtn.onclick=function(){
-      // Listázás modalban
       saveList.innerHTML='';
       const keys=Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_')).sort().reverse();
       if(keys.length===0) saveList.innerHTML='<li>Nincs mentett állás.</li>';
       else keys.forEach(key=>{
         const item=JSON.parse(localStorage.getItem(key));
         const li=document.createElement('li');
-        li.innerHTML='<button data-key="'+key+'">Betöltés</button> ' + 
-          (item.snapshot?('<b>'+item.snapshot+'</b> '):'') + 
+        li.innerHTML='<button data-key="'+key+'">Betöltés</button> ' +
+          (item.snapshot?('<b>'+item.snapshot+'</b> '):'') +
           item.timestamp;
         saveList.appendChild(li);
       });
@@ -496,9 +473,10 @@
           const obj=JSON.parse(localStorage.getItem(key));
           canvas.loadFromJSON(obj.canvas, function() {
             canvas.renderAll();
-            postItData.length=0;
-            canvas.getObjects('group').forEach(g=>g.data && postItData.push(g.data));
+            // JAVÍTÁS: újrainicializáljuk minden group-ot!
             canvas.getObjects('group').forEach(makeGroupInteractive);
+            // újraépítjük a postItData tömböt!
+            postItData = canvas.getObjects('group').map(g=>g.data);
             updateStats();
           });
           saveLoadModal.style.display='none';
@@ -521,18 +499,10 @@
     document.getElementById('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
-
-    // Bármilyen műveletnél automatikus undo save
-    canvas.on('object:modified',function(){saveUndo();});
-    canvas.on('object:removed',function(){saveUndo();});
-    canvas.on('object:added',function(opt){
-      if(!(opt && opt.target && opt.target.type==='group')) saveUndo();
-    });
-    // Első undo state
-    saveUndo();
   </script>
 </body>
 </html>
+
 
 
 
