@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>5PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -88,11 +88,11 @@
     const postItData = [];
     let version = 1, baseTimestamp = new Date();
     const canvas = new fabric.Canvas('c', { selection: true });
-    let mode = 'draw', isLine=false, lineStart=null, currentLine=null;
+    let mode = 'select', isLine=false, lineStart=null, currentLine=null;
     let isRect=false, rectStart=null, currentRect=null;
     let isPanning=false, startPan={x:0,y:0};
     let addingPostIt=false, tmpPostItData=null;
-    canvas.isDrawingMode=true; canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
+    canvas.isDrawingMode=false; canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
     // UI refs
     const fileInput=document.getElementById('file-input'), drawBtn=document.getElementById('draw-btn'),
       lineBtn=document.getElementById('line-btn'), rectBtn=document.getElementById('rect-btn'),
@@ -120,7 +120,23 @@
     // Post-it modal
     postitBtn.onclick=()=>{form.reset();const tpl=templateSelect.value;document.getElementById('header-input').value=tpl;const cmap={ 'Megrendelő pénzügyi':'#FFD700','Megrendelő műszaki':'#ADFF2F','Kivitelező építész pályáztatás':'#87CEEB','Kivitelező gépész pályáztatás':'#FF69B4','Kivitelező elektromos pályáztatás':'#FFA500','Kivitelező építész műszaki':'#20B2AA','Kivitelező gépész műszaki':'#9370DB','Kivitelező elektromos műszaki':'#FF6347','Belsőépítész tervező':'#40E0D0','Elektromos tervező':'#DB7093','Tűzvédelem':'#DC143C','Brand (Accor)':'#4682B4','Üzemeltető (Demény Gábor)':'#66CDAA','Üzemeltető (Balogh Károly)':'#D2691E','Üres 1':'#FFE4B5','Üres 2':'#E6E6FA','Üres 3':'#F0E68C','Üres 4':'#AFEEEE','Üres 5':'#FFDAB9','Egyéni':'#FFEB3B'};document.getElementById('color-input').value=cmap[tpl]||'#ffeb3b';overlay.style.display=modal.style.display='block';addingPostIt=false;};
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none';addingPostIt=false;tmpPostItData=null;};
-    form.onsubmit=e=>{e.preventDefault();tmpPostItData={header:document.getElementById('header-input').value,color:document.getElementById('color-input').value,akadaly:document.getElementById('akadaly-input').value,kozig:document.getElementById('kozig-input').value,hatarido:document.getElementById('hatarido-input').value,helyisegcsoport:document.getElementById('helyisegcsoport-input').value,megjegyzes:document.getElementById('megj-input').value};overlay.style.display=modal.style.display='none';addingPostIt=true;};
+    form.onsubmit = e => {
+      e.preventDefault();
+      tmpPostItData = {
+        header: document.getElementById('header-input').value,
+        color: document.getElementById('color-input').value,
+        akadaly: document.getElementById('akadaly-input').value,
+        kozig: document.getElementById('kozig-input').value,
+        hatarido: document.getElementById('hatarido-input').value,
+        helyisegcsoport: document.getElementById('helyisegcsoport-input').value,
+        megjegyzes: document.getElementById('megj-input').value
+      };
+      overlay.style.display = modal.style.display = 'none';
+      addingPostIt = true;
+      // After creating, switch to select mode
+      mode = 'select';
+      canvas.isDrawingMode = false;
+    };
     // Stats & exports
     function updateStats(){document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;document.getElementById('stat-count').textContent=postItData.length;const by={};postItData.forEach(d=>by[d.kozig]=(by[d.kozig]||0)+1);const ul=document.getElementById('stat-by-responsible');ul.innerHTML='';Object.entries(by).forEach(([r,c])=>{const li=document.createElement('li');li.textContent=`${r}: ${c}`;ul.appendChild(li);});}
     updateStats();
