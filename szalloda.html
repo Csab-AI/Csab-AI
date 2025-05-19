@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>8PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>12PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -102,55 +102,15 @@
     let isPanning = false, startPan = { x:0, y:0 };
     let addingPostIt = false, tmpPostItData = null;
 
-    // Undo stack
-    const stateStack = [];
-    const saveState = () => stateStack.push(JSON.stringify(canvas.toJSON()));
-    const undo = () => {
-      if (stateStack.length > 0) {
-        const last = stateStack.pop();
-        canvas.loadFromJSON(last, () => canvas.renderAll());
+    // Simplified undo: remove last added object
+    undoBtn.onclick = () => {
+      const objs = canvas.getObjects();
+      if (objs.length > 0) {
+        canvas.remove(objs[objs.length - 1]);
+        canvas.renderAll();
+        updateStats();
       }
     };
-
-    // Initial state
-    saveState();
-
-    // Capture modifications
-    canvas.on('object:added', saveState);
-    canvas.on('object:modified', saveState);
-    canvas.on('object:removed', saveState);
-
-    // Drawing settings
-    canvas.isDrawingMode = false;
-    canvas.freeDrawingBrush.color = '#ff0000';
-    canvas.freeDrawingBrush.width = 2;
-
-    // UI refs
-    const fileInput = document.getElementById('file-input');
-    const drawBtn = document.getElementById('draw-btn');
-    const lineBtn = document.getElementById('line-btn');
-    const rectBtn = document.getElementById('rect-btn');
-    const panBtn = document.getElementById('pan-btn');
-    const undoBtn = document.getElementById('undo-btn');
-    const textBtn = document.getElementById('text-btn');
-    const postitBtn = document.getElementById('postit-btn');
-    const colorPicker = document.getElementById('color-picker');
-    const strokeWidth = document.getElementById('stroke-width');
-    const templateSelect = document.getElementById('template-select');
-    const exportPdfBtn = document.getElementById('export-pdf-btn');
-    const exportSummaryBtn = document.getElementById('export-summary-btn');
-    const overlay = document.getElementById('modal-overlay');
-    const modal = document.getElementById('modal');
-    const form = document.getElementById('postit-form');
-    const cancelBtn = document.getElementById('cancel-btn');
-
-    // Mode toggles
-    drawBtn.onclick = () => { mode = 'draw'; canvas.isDrawingMode = true; };
-    lineBtn.onclick = () => { mode = 'line'; canvas.isDrawingMode = false; };
-    rectBtn.onclick = () => { mode = 'rect'; canvas.isDrawingMode = false; };
-    panBtn.onclick = () => { mode = 'pan'; canvas.isDrawingMode = false; };
-    textBtn.onclick = () => { mode = 'text'; canvas.isDrawingMode = false; };
-    undoBtn.onclick = undo;
 
     colorPicker.onchange = e => canvas.freeDrawingBrush.color = e.target.value;
     strokeWidth.onchange = e => canvas.freeDrawingBrush.width = parseInt(e.target.value, 10) || 1;
