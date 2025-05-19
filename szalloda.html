@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>10PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>X1PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -312,6 +312,8 @@
       group.set({
         hasBorders: true,
         hasControls: true,
+        lockScalingX: false,
+        lockScalingY: false,
         lockScalingFlip: true,
         lockRotation: true,
         selectable: true,
@@ -362,7 +364,6 @@
         editingGroup.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         editingGroup.setCoords();
         canvas.requestRenderAll();
-        // postItData szinkron
         postItData = canvas.getObjects('group').map(g=>g.data);
         editingGroup = null;
       } else {
@@ -440,9 +441,11 @@
       if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undoBtn.onclick(); }
     });
 
+    // *** JAVÍTOTT MENTÉS/VISSZATÖLTÉS, minden custom adattal, group property-vel, interaktivitással! ***
     saveBtn.onclick=function(){
       const now=new Date();
       const key="pdfrajz_"+now.toISOString().replace(/:/g,'');
+      // canvas.toDatalessJSON(['data']) minden .data property-t is ment!
       const saveObj={
         timestamp: now.toLocaleString(),
         canvas: canvas.toDatalessJSON(['data']),
@@ -451,6 +454,7 @@
       localStorage.setItem(key, JSON.stringify(saveObj));
       alert("Állás mentve: " + saveObj.timestamp);
     };
+
     loadBtn.onclick=function(){
       saveList.innerHTML='';
       const keys=Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_')).sort().reverse();
@@ -473,9 +477,9 @@
           const obj=JSON.parse(localStorage.getItem(key));
           canvas.loadFromJSON(obj.canvas, function() {
             canvas.renderAll();
-            // JAVÍTÁS: újrainicializáljuk minden group-ot!
+            // Minden group-on újra állítsd be az interaktív property-ket!
             canvas.getObjects('group').forEach(makeGroupInteractive);
-            // újraépítjük a postItData tömböt!
+            // Frissítsd a postItData tömböt is!
             postItData = canvas.getObjects('group').map(g=>g.data);
             updateStats();
           });
@@ -502,6 +506,7 @@
   </script>
 </body>
 </html>
+
 
 
 
