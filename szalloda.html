@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>4PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -126,14 +126,15 @@
     }
 
     // Mode toggles
-    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);};
-    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;setActiveButton(lineBtn);};
-    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;setActiveButton(rectBtn);};
-    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;setActiveButton(textBtn);};
+    drawBtn.onclick=()=>{mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);canvas.selection=true;canvas.defaultCursor='default';};
+    lineBtn.onclick=()=>{mode='line';canvas.isDrawingMode=false;setActiveButton(lineBtn);canvas.selection=true;canvas.defaultCursor='default';};
+    rectBtn.onclick=()=>{mode='rect';canvas.isDrawingMode=false;setActiveButton(rectBtn);canvas.selection=true;canvas.defaultCursor='default';};
+    textBtn.onclick=()=>{mode='text';canvas.isDrawingMode=false;setActiveButton(textBtn);canvas.selection=true;canvas.defaultCursor='default';};
     panBtn.onclick=()=>{
       mode='pan';canvas.isDrawingMode=false;setActiveButton(panBtn);
       canvas.selection=false; // ne lehessen elemet kijelölni pan módban
       canvas.defaultCursor='grab';
+      canvas.discardActiveObject();
     };
     postitBtn.onclick=()=>{
       form.reset();
@@ -190,21 +191,46 @@
 
     // Pan & Zoom state
     let isDragging=false, lastPosX=0, lastPosY=0;
+    let editSingleObjectMode = false; // ideiglenes állapot
 
     // Canvas events (rajzeszközök és pan/zoom)
     canvas.on('mouse:down',opt=>{
       const e=opt.e, p=canvas.getPointer(e);
-      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
-      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
-      else if(mode==='pan'&&e.button===0){
+
+      // ---- PAN MÓDBAN JOBBGOMBOS ELEM KIJELÖLÉS ----
+      if(mode==='pan' && e.button===2) {
+        // ellenőrizzük, hogy objektumra kattintott-e
+        const target = canvas.findTarget(e, true);
+        if(target) {
+          // csak az adott objektum legyen kijelölve
+          canvas.setActiveObject(target);
+          canvas.selection=true; // engedélyezzük a mozgatást/átméretezést
+          editSingleObjectMode=true;
+          canvas.defaultCursor='move';
+        } else {
+          // háttérre jobb klikk - semmi
+        }
+        // ne jelenjen meg a böngésző context menü!
+        e.preventDefault();
+        return;
+      }
+
+      // PAN MÓDBAN BAL GOMB drag a teljes rajzra
+      if(mode==='pan' && e.button===0 && !editSingleObjectMode) {
         isDragging=true;
         lastPosX=e.clientX;
         lastPosY=e.clientY;
         canvas.defaultCursor='grabbing';
+        canvas.discardActiveObject();
       }
+
+      // Egyéb módok (rajzolás, rect stb.)
+      if(editSingleObjectMode) return; // amíg editSingleObjectMode van, más funkciót ne engedjünk
+      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
+      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
       else if(mode==='text'){
         const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));
-        mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);
+        mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);canvas.selection=true;canvas.defaultCursor='default';
       }
       else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){
         mode='line';isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
@@ -227,7 +253,8 @@
         currentRect.set({width:Math.abs(w),height:Math.abs(h),left:w<0?p.x:rectStart.x,top:h<0?p.y:rectStart.y});
         canvas.requestRenderAll();return;
       }
-      if(mode==='pan'&&isDragging){
+      // Pan: csak ha nem editSingleObjectMode-ban vagyunk
+      if(mode==='pan' && isDragging && !editSingleObjectMode){
         const v=canvas.viewportTransform;
         v[4]+=e.clientX-lastPosX;
         v[5]+=e.clientY-lastPosY;
@@ -240,12 +267,12 @@
       if(isLine){currentLine.set({selectable:true});isLine=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
       if(isRect){currentRect.set({selectable:true});isRect=false;mode='draw';canvas.isDrawingMode=true;setActiveButton(drawBtn);}
       isDragging=false;
-      if(mode==='pan') canvas.defaultCursor='grab';
+      if(mode==='pan' && !editSingleObjectMode) canvas.defaultCursor='grab';
       else canvas.defaultCursor='default';
     });
 
     canvas.on('mouse:wheel',opt=>{
-      if(mode==='pan'){
+      if(mode==='pan' && !editSingleObjectMode){
         let z=canvas.getZoom();
         z*=Math.pow(0.999, opt.e.deltaY);
         z=Math.min(Math.max(z,0.5),10);
@@ -256,11 +283,49 @@
 
     // Ha visszaváltasz pan-ról, engedélyezd az elemek kijelölését
     function restoreSelection() {
-      if(mode!=='pan') canvas.selection=true;
-      if(mode!=='pan') canvas.defaultCursor='default';
+      if(mode!=='pan') {
+        canvas.selection=true;
+        canvas.defaultCursor='default';
+        editSingleObjectMode = false;
+      }
     }
     // Bármely eszközre kattintva visszaáll
     [drawBtn,lineBtn,rectBtn,textBtn,postitBtn].forEach(b=>b.addEventListener('click',restoreSelection));
+
+    // --- Kilépés egyedi elem edit módjából: ---
+    // 1) Ha bárhová kattintasz a canvas-on, DE NEM egy elemre
+    canvas.on('before:selection:cleared', function(opt) {
+      if(mode==='pan' && editSingleObjectMode) {
+        editSingleObjectMode = false;
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+      }
+    });
+    // 2) Ha ESC-et nyomsz, törlöd a kijelölést és visszatér pan módba
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape' && editSingleObjectMode) {
+        canvas.discardActiveObject();
+        editSingleObjectMode = false;
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+        canvas.requestRenderAll();
+      }
+    });
+
+    // 3) Ha a kijelölt objektum mozgatása/átméretezése után leklikkelsz máshová (kijelölés megszűnik), visszatér pan módba
+    canvas.on('selection:cleared', function(opt) {
+      if(mode==='pan' && editSingleObjectMode) {
+        editSingleObjectMode = false;
+        canvas.selection = false;
+        canvas.defaultCursor = 'grab';
+        canvas.requestRenderAll();
+      }
+    });
+
+    // --- tiltjuk a context menüt canvas-on, hogy ne jöjjön fel pan módban jobb gombbal ---
+    document.getElementById('c').addEventListener('contextmenu',function(e){
+      if(mode==='pan') e.preventDefault();
+    });
 
     // Post-it form
     form.onsubmit=e=>{
@@ -324,15 +389,7 @@
       pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height);
       pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
     };
-
-    // Megakadályozzuk, hogy pan módban az elemeket lehessen kijelölni/módosítani
-    canvas.on('before:selection:cleared', function(opt) {
-      if(mode==='pan') opt.e.preventDefault();
-    });
-    canvas.on('object:selected', function(opt) {
-      if(mode==='pan') canvas.discardActiveObject();
-    });
-
   </script>
 </body>
 </html>
+
