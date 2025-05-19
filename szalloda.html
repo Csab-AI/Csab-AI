@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>13PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -23,6 +23,12 @@
     #modal input, #modal textarea, #modal select { width:100%; box-sizing:border-box; }
     #modal textarea { resize:vertical; }
     #modal .buttons { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
+    #save-load-modal {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+      background:#fff;padding:16px 20px;z-index:410;border-radius:8px;display:none;box-shadow:0 2px 10px rgba(0,0,0,0.3);}
+    #save-load-modal h3{margin:0 0 8px;}
+    #save-load-modal ul{padding:0 0 8px 0;max-height:160px;overflow:auto;}
+    #save-load-modal ul li{margin:0 0 4px 0;}
+    #save-load-modal button{margin-right:8px;}
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
@@ -37,6 +43,9 @@
     <button id="rect-btn">Téglalap</button>
     <button id="select-btn">Kijelölés</button>
     <button id="pan-btn">Mozgatás</button>
+    <button id="undo-btn">Visszavonás</button>
+    <button id="save-btn">Állás mentése</button>
+    <button id="load-btn">Állás betöltése</button>
     <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
     <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
     <button id="text-btn">Felirat</button>
@@ -90,6 +99,13 @@
       </div>
     </form>
   </div>
+  <div id="save-load-modal">
+    <h3>Elmentett állások</h3>
+    <ul id="save-list"></ul>
+    <div style="text-align:right">
+      <button id="close-save-load-btn">Bezár</button>
+    </div>
+  </div>
   <script>
     const { jsPDF } = window.jspdf;
     const postItData = [];
@@ -101,6 +117,26 @@
     let isRect=false, rectStart=null, currentRect=null;
     canvas.isDrawingMode=true;
     canvas.freeDrawingBrush.color='#ff0000'; canvas.freeDrawingBrush.width=2;
+
+    // Undo stack
+    const undoStack = [];
+    function saveUndo() {
+      // limit stack size
+      if(undoStack.length>40) undoStack.shift();
+      undoStack.push(canvas.toDatalessJSON(['data']));
+    }
+    function undo() {
+      if(undoStack.length===0) return;
+      const prev = undoStack.pop();
+      canvas.loadFromJSON(prev, function() {
+        canvas.renderAll();
+        // postItData sync
+        postItData.length=0;
+        canvas.getObjects('group').forEach(g=>g.data && postItData.push(g.data));
+        canvas.getObjects('group').forEach(makeGroupInteractive);
+        updateStats();
+      });
+    }
 
     // UI refs
     const fileInput=document.getElementById('file-input');
@@ -116,10 +152,16 @@
     const templateSelect=document.getElementById('template-select');
     const exportPdfBtn=document.getElementById('export-pdf-btn');
     const exportSummaryBtn=document.getElementById('export-summary-btn');
+    const undoBtn=document.getElementById('undo-btn');
+    const saveBtn=document.getElementById('save-btn');
+    const loadBtn=document.getElementById('load-btn');
     const overlay=document.getElementById('modal-overlay');
     const modal=document.getElementById('modal');
     const form=document.getElementById('postit-form');
     const cancelBtn=document.getElementById('cancel-btn');
+    const saveLoadModal=document.getElementById('save-load-modal');
+    const saveList=document.getElementById('save-list');
+    const closeSaveLoadBtn=document.getElementById('close-save-load-btn');
 
     // Helper: button highlight
     function setActiveButton(btn) {
@@ -173,7 +215,6 @@
         m==='text'?textBtn:
         m==='postit'?postitBtn:null
       );
-      // Canvas paraméterek
       canvas.isDrawingMode = (mode==='draw');
       if(mode==='select') {
         canvas.selection = true;
@@ -191,12 +232,11 @@
         canvas.discardActiveObject();
       }
     }
-    setMode('draw'); // Alapértelmezett
+    setMode('draw');
 
     // Segédfüggvény: minden objektum kijelölhetősége
     function setAllSelectable(val) {
       canvas.getObjects().forEach(obj=>{
-        // A postit group, a vonalak, rect stb. mind legyen selectable
         if(obj.type==='group' || obj.type==='rect' || obj.type==='line' || obj.type==='textbox' || obj.type==='text') {
           obj.selectable = val;
           obj.evented = val;
@@ -230,13 +270,10 @@
 
     // Pan & Zoom state
     let isDragging=false, lastPosX=0, lastPosY=0;
-    let editSingleObjectMode = false;
 
     // Canvas events
     canvas.on('mouse:down',opt=>{
       const e=opt.e, p=canvas.getPointer(e);
-
-      // PAN MÓDBAN BAL GOMB DRAG
       if(mode==='pan' && e.button===0) {
         isDragging=true;
         lastPosX=e.clientX;
@@ -244,16 +281,15 @@
         canvas.defaultCursor='grabbing';
         canvas.discardActiveObject();
       }
-
-      // Rajzeszközök
-      if(mode==='line'){isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
-      else if(mode==='rect'){isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
+      if(mode==='line'){saveUndo();isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);}
+      else if(mode==='rect'){saveUndo();isRect=true;rectStart=p;currentRect=new fabric.Rect({left:p.x,top:p.y,width:0,height:0,fill:'transparent',stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentRect);}
       else if(mode==='text'){
-        const t=prompt('Szöveg:');if(t)canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));
+        const t=prompt('Szöveg:');if(t){saveUndo();canvas.add(new fabric.Textbox(t,{left:p.x,top:p.y,fill:canvas.freeDrawingBrush.color,fontSize:16}));}
         setMode('draw');
       }
       else if(!isLine&&!isRect&&mode==='draw'&&e.shiftKey){
         setMode('line');
+        saveUndo();
         isLine=true;lineStart=p;currentLine=new fabric.Line([p.x,p.y,p.x,p.y],{stroke:canvas.freeDrawingBrush.color,strokeWidth:canvas.freeDrawingBrush.width,selectable:false});canvas.add(currentLine);
       }
     });
@@ -311,7 +347,6 @@
         selectable: true,
         evented: true
       });
-      // fabric.js 5.x double click workaround:
       group.on('mousedown', function (opt) {
         if (mode!=='select') return;
         if (opt.e && opt.e.detail === 2) {
@@ -346,9 +381,9 @@
       const meg=document.getElementById('megj-input').value;
 
       if(form.getAttribute('data-edit') === 'true' && editingGroup) {
-        // Szerkesztés meglévőn!
-        editingGroup.item(0).set('fill', color); // szín
-        editingGroup.item(1).set('text', header); // fejléc
+        saveUndo();
+        editingGroup.item(0).set('fill', color);
+        editingGroup.item(1).set('text', header);
         editingGroup.item(2).set('text', [
           `1. Leírás: ${akad}`,
           `2. Közreműködő: ${kozg}`,
@@ -363,7 +398,7 @@
         if(idx>-1) postItData[idx]=editingGroup.data;
         editingGroup = null;
       } else {
-        // Új post-it hozzáadása
+        saveUndo();
         const p=lineStart||{x:canvas.width/2,y:canvas.height/2};
         const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});
         const head=new fabric.Text(header,{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});
@@ -380,7 +415,13 @@
     };
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none'; form.removeAttribute('data-edit'); editingGroup=null;};
 
-    // Stats & exports
+    // Undo gomb
+    undoBtn.onclick=()=>{undo();};
+    document.addEventListener('keydown',function(e){
+      if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undo(); }
+    });
+
+    // Stat, export
     function updateStats(){
       document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;
       document.getElementById('stat-count').textContent=postItData.length;
@@ -420,6 +461,54 @@
       pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
     };
 
+    // Mentés/betöltés funkció (localStorage)
+    saveBtn.onclick=function(){
+      const now=new Date();
+      const key="pdfrajz_"+now.toISOString().replace(/:/g,'');
+      const saveObj={
+        timestamp: now.toLocaleString(),
+        canvas: canvas.toDatalessJSON(['data']),
+        snapshot: baseTimestamp.toLocaleString()+' v'+version
+      };
+      localStorage.setItem(key, JSON.stringify(saveObj));
+      alert("Állás mentve: " + saveObj.timestamp);
+    };
+    loadBtn.onclick=function(){
+      // Listázás modalban
+      saveList.innerHTML='';
+      const keys=Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_')).sort().reverse();
+      if(keys.length===0) saveList.innerHTML='<li>Nincs mentett állás.</li>';
+      else keys.forEach(key=>{
+        const item=JSON.parse(localStorage.getItem(key));
+        const li=document.createElement('li');
+        li.innerHTML='<button data-key="'+key+'">Betöltés</button> ' + 
+          (item.snapshot?('<b>'+item.snapshot+'</b> '):'') + 
+          item.timestamp;
+        saveList.appendChild(li);
+      });
+      saveLoadModal.style.display='block';
+    };
+    saveList.onclick=function(e){
+      if(e.target.tagName==='BUTTON'){
+        const key=e.target.getAttribute('data-key');
+        if(key && localStorage.getItem(key)){
+          if(!confirm('Biztosan betölti ezt az állást? A jelenlegi elveszik!')) return;
+          const obj=JSON.parse(localStorage.getItem(key));
+          canvas.loadFromJSON(obj.canvas, function() {
+            canvas.renderAll();
+            postItData.length=0;
+            canvas.getObjects('group').forEach(g=>g.data && postItData.push(g.data));
+            canvas.getObjects('group').forEach(makeGroupInteractive);
+            updateStats();
+          });
+          saveLoadModal.style.display='none';
+        }
+      }
+    }
+    closeSaveLoadBtn.onclick=function(){
+      saveLoadModal.style.display='none';
+    }
+
     // Új post-it létrehozásakor legyen interaktív!
     canvas.on('object:added', function(opt){
       if(opt && opt.target && opt.target.type==='group') makeGroupInteractive(opt.target);
@@ -432,9 +521,19 @@
     document.getElementById('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
+
+    // Bármilyen műveletnél automatikus undo save
+    canvas.on('object:modified',function(){saveUndo();});
+    canvas.on('object:removed',function(){saveUndo();});
+    canvas.on('object:added',function(opt){
+      if(!(opt && opt.target && opt.target.type==='group')) saveUndo();
+    });
+    // Első undo state
+    saveUndo();
   </script>
 </body>
 </html>
+
 
 
 
