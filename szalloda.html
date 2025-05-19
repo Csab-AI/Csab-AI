@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>X1PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -23,12 +23,14 @@
     #modal input, #modal textarea, #modal select { width:100%; box-sizing:border-box; }
     #modal textarea { resize:vertical; }
     #modal .buttons { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
-    #save-load-modal {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    #save-load-modal, #verzio-modal {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
       background:#fff;padding:16px 20px;z-index:410;border-radius:8px;display:none;box-shadow:0 2px 10px rgba(0,0,0,0.3);}
-    #save-load-modal h3{margin:0 0 8px;}
-    #save-load-modal ul{padding:0 0 8px 0;max-height:160px;overflow:auto;}
-    #save-load-modal ul li{margin:0 0 4px 0;}
-    #save-load-modal button{margin-right:8px;}
+    #save-load-modal h3, #verzio-modal h3 {margin:0 0 8px;}
+    #save-load-modal ul, #verzio-modal ul {padding:0 0 8px 0;max-height:160px;overflow:auto;}
+    #save-load-modal ul li, #verzio-modal ul li {margin:0 0 4px 0;}
+    #save-load-modal button, #verzio-modal button{margin-right:8px;}
+    #project-name-edit {font-weight:bold; border:none; background:transparent; outline:none; font-size:1em;}
+    #project-name-edit:hover, #project-name-edit:focus { background: #eee; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
@@ -44,8 +46,12 @@
     <button id="select-btn">Kijelölés</button>
     <button id="pan-btn">Mozgatás</button>
     <button id="undo-btn">Visszavonás</button>
-    <button id="save-btn">Állás mentése</button>
-    <button id="load-btn">Állás betöltése</button>
+    <span style="margin-left:8px">
+      <input id="project-name-edit" title="Projekt neve szerkeszthető" value="Névtelen projekt">
+    </span>
+    <button id="save-version-btn">Verzió mentése</button>
+    <button id="load-version-btn">Verzió visszatöltése</button>
+    <button id="new-project-btn" style="color:#a00">Új projekt</button>
     <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
     <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
     <button id="text-btn">Felirat</button>
@@ -99,18 +105,18 @@
       </div>
     </form>
   </div>
-  <div id="save-load-modal">
-    <h3>Elmentett állások</h3>
-    <ul id="save-list"></ul>
-    <div style="text-align:right">
-      <button id="close-save-load-btn">Bezár</button>
-    </div>
+  <!-- Verzió visszatöltő popup -->
+  <div id="verzio-modal">
+    <h3>Mentett verziók</h3>
+    <ul id="verzio-list"></ul>
+    <div style="text-align:right"><button id="verzio-close-btn">Bezár</button></div>
   </div>
   <script>
     const { jsPDF } = window.jspdf;
     let postItData = [];
     let version = 1;
     let baseTimestamp = new Date();
+    let projectName = localStorage.getItem('pdfrajz_projectname') || 'Névtelen projekt';
     const canvas = new fabric.Canvas('c', { selection:true });
     let mode='draw', isLine=false, lineStart=null, currentLine=null;
     let isRect=false, rectStart=null, currentRect=null;
@@ -132,15 +138,25 @@
     const exportPdfBtn=document.getElementById('export-pdf-btn');
     const exportSummaryBtn=document.getElementById('export-summary-btn');
     const undoBtn=document.getElementById('undo-btn');
-    const saveBtn=document.getElementById('save-btn');
-    const loadBtn=document.getElementById('load-btn');
+    const saveVersionBtn=document.getElementById('save-version-btn');
+    const loadVersionBtn=document.getElementById('load-version-btn');
+    const newProjectBtn=document.getElementById('new-project-btn');
     const overlay=document.getElementById('modal-overlay');
     const modal=document.getElementById('modal');
     const form=document.getElementById('postit-form');
     const cancelBtn=document.getElementById('cancel-btn');
-    const saveLoadModal=document.getElementById('save-load-modal');
-    const saveList=document.getElementById('save-list');
-    const closeSaveLoadBtn=document.getElementById('close-save-load-btn');
+    const verzioModal=document.getElementById('verzio-modal');
+    const verzioList=document.getElementById('verzio-list');
+    const verzioCloseBtn=document.getElementById('verzio-close-btn');
+    const projectNameEdit=document.getElementById('project-name-edit');
+
+    // Projekt név (helyreállítás UI-ra)
+    projectNameEdit.value = projectName;
+    projectNameEdit.onchange = function(){
+      projectName = projectNameEdit.value.trim() || "Névtelen projekt";
+      localStorage.setItem('pdfrajz_projectname', projectName);
+      updateStats();
+    };
 
     function setActiveButton(btn) {
       [drawBtn,lineBtn,rectBtn,selectBtn,panBtn,textBtn,postitBtn].forEach(b=>b.classList.remove('active'));
@@ -384,7 +400,7 @@
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none'; form.removeAttribute('data-edit'); editingGroup=null;};
 
     function updateStats(){
-      document.getElementById('snapshot-info').textContent=baseTimestamp.toLocaleString()+' v'+version;
+      document.getElementById('snapshot-info').textContent=projectName+" | "+baseTimestamp.toLocaleString()+' v'+version;
       document.getElementById('stat-count').textContent=postItData.length;
       const by={};
       postItData.forEach(d=>by[d.kozig]=(by[d.kozig]||0)+1);
@@ -399,7 +415,7 @@
     updateStats();
 
     exportSummaryBtn.onclick=()=>{
-      const lines=['# Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];
+      const lines=['# '+projectName+' Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];
       postItData.forEach((d,i)=>{
         lines.push('## '+(i+1)+'. '+d.header);
         lines.push('- **Akadály:** '+d.akadaly);
@@ -427,7 +443,6 @@
       // ne töröld a hátteret!
       const objs = canvas.getObjects();
       if(objs.length > 0){
-        // Legutóbbi utolsó objektum, de ha háttérkép, azt nem!
         let last = objs[objs.length-1];
         if(last === canvas.backgroundImage && objs.length>1) last = objs[objs.length-2];
         canvas.remove(last);
@@ -441,71 +456,122 @@
       if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undoBtn.onclick(); }
     });
 
-    // *** JAVÍTOTT MENTÉS/VISSZATÖLTÉS, minden custom adattal, group property-vel, interaktivitással! ***
-    saveBtn.onclick=function(){
-      const now=new Date();
-      const key="pdfrajz_"+now.toISOString().replace(/:/g,'');
-      // canvas.toDatalessJSON(['data']) minden .data property-t is ment!
-      const saveObj={
-        timestamp: now.toLocaleString(),
-        canvas: canvas.toDatalessJSON(['data']),
-        snapshot: baseTimestamp.toLocaleString()+' v'+version
+    // --- VERZIÓMENTÉS ---
+    saveVersionBtn.onclick = function() {
+      const now = new Date();
+      const key = 'pdfrajz_verzio_' + now.toISOString().replace(/:/g,'-');
+      const meta = {
+        name: projectName,
+        date: now.toLocaleString(),
+        canvas: canvas.toDatalessJSON(['data'])
       };
-      localStorage.setItem(key, JSON.stringify(saveObj));
-      alert("Állás mentve: " + saveObj.timestamp);
+      localStorage.setItem(key, JSON.stringify(meta));
+      alert('Verzió mentve: ' + projectName + " - " + meta.date);
     };
-
-    loadBtn.onclick=function(){
-      saveList.innerHTML='';
-      const keys=Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_')).sort().reverse();
-      if(keys.length===0) saveList.innerHTML='<li>Nincs mentett állás.</li>';
+    loadVersionBtn.onclick = function() {
+      verzioList.innerHTML = '';
+      const keys = Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_verzio_')).sort().reverse();
+      if(keys.length===0) verzioList.innerHTML = '<li>Nincs mentett verzió.</li>';
       else keys.forEach(key=>{
-        const item=JSON.parse(localStorage.getItem(key));
-        const li=document.createElement('li');
-        li.innerHTML='<button data-key="'+key+'">Betöltés</button> ' +
-          (item.snapshot?('<b>'+item.snapshot+'</b> '):'') +
-          item.timestamp;
-        saveList.appendChild(li);
+        const meta = JSON.parse(localStorage.getItem(key));
+        const li = document.createElement('li');
+        li.innerHTML = `<button data-key="${key}">Betöltés</button> <b>${meta.name||''}</b> - <span>${meta.date}</span>`;
+        verzioList.appendChild(li);
       });
-      saveLoadModal.style.display='block';
+      verzioModal.style.display = 'block';
     };
-    saveList.onclick=function(e){
+    verzioList.onclick = function(e){
       if(e.target.tagName==='BUTTON'){
-        const key=e.target.getAttribute('data-key');
+        const key = e.target.getAttribute('data-key');
         if(key && localStorage.getItem(key)){
-          if(!confirm('Biztosan betölti ezt az állást? A jelenlegi elveszik!')) return;
-          const obj=JSON.parse(localStorage.getItem(key));
-          canvas.loadFromJSON(obj.canvas, function() {
+          if(!confirm('Biztosan betölti ezt a verziót? A jelenlegi elveszik!')) return;
+          const meta = JSON.parse(localStorage.getItem(key));
+          projectName = meta.name || "Névtelen projekt";
+          projectNameEdit.value = projectName;
+          localStorage.setItem('pdfrajz_projectname', projectName);
+          canvas.loadFromJSON(meta.canvas, function() {
             canvas.renderAll();
-            // Minden group-on újra állítsd be az interaktív property-ket!
             canvas.getObjects('group').forEach(makeGroupInteractive);
-            // Frissítsd a postItData tömböt is!
             postItData = canvas.getObjects('group').map(g=>g.data);
             updateStats();
           });
-          saveLoadModal.style.display='none';
+          verzioModal.style.display = 'none';
         }
       }
+    };
+    verzioCloseBtn.onclick = function() {
+      verzioModal.style.display = 'none';
+    };
+
+    // --- ÚJ PROJEKT ---
+    newProjectBtn.onclick = function() {
+      const pname = prompt("Új projekt neve:", "Névtelen projekt");
+      if(pname===null) return;
+      if(!confirm("Biztosan új projektet nyit, minden törlődik?")) return;
+      projectName = pname.trim() || "Névtelen projekt";
+      projectNameEdit.value = projectName;
+      localStorage.setItem('pdfrajz_projectname', projectName);
+      canvas.clear();
+      postItData = [];
+      version = 1;
+      baseTimestamp = new Date();
+      updateStats();
+      // töröld az autosave-t is:
+      localStorage.removeItem('pdfrajz_autosave');
+    };
+
+    // --- AUTOMATIKUS MENTÉS minden módosításnál ---
+    function autoSave() {
+      try {
+        const state = JSON.stringify({
+          name: projectName,
+          canvas: canvas.toDatalessJSON(['data']),
+          timestamp: new Date().toLocaleString()
+        });
+        localStorage.setItem('pdfrajz_autosave', state);
+        localStorage.setItem('pdfrajz_projectname', projectName);
+      } catch (e) {
+        console.warn("Auto-save error:", e);
+      }
     }
-    closeSaveLoadBtn.onclick=function(){
-      saveLoadModal.style.display='none';
-    }
+    canvas.on('object:added', autoSave);
+    canvas.on('object:removed', autoSave);
+    canvas.on('object:modified', autoSave);
+
+    // --- AUTOMATIKUS VISSZATÖLTÉS oldalinduláskor ---
+    window.addEventListener('DOMContentLoaded', function() {
+      const state = localStorage.getItem('pdfrajz_autosave');
+      if(state) {
+        try {
+          const data = JSON.parse(state);
+          projectName = data.name || "Névtelen projekt";
+          projectNameEdit.value = projectName;
+          canvas.loadFromJSON(data.canvas, function() {
+            canvas.renderAll();
+            canvas.getObjects('group').forEach(makeGroupInteractive);
+            postItData = canvas.getObjects('group').map(g=>g.data);
+            updateStats();
+          });
+        } catch (e) {
+          console.warn("Auto-load error:", e);
+        }
+      }
+    });
 
     // Új post-it létrehozásakor legyen interaktív!
     canvas.on('object:added', function(opt){
       if(opt && opt.target && opt.target.type==='group') makeGroupInteractive(opt.target);
     });
 
-    // Első renderelés előtt: ha már vannak group-ok (lehet hogy visszatöltötted), tedd interaktívvá!
     canvas.getObjects('group').forEach(makeGroupInteractive);
 
-    // Context menu tiltása pan módban
     document.getElementById('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
   </script>
 </body>
 </html>
+
 
 
 
