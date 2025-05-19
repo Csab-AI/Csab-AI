@@ -104,7 +104,31 @@
     colorPicker.onchange = e => canvas.freeDrawingBrush.color = e.target.value;
     strokeWidth.onchange = e => canvas.freeDrawingBrush.width = parseInt(e.target.value,10)||1;
 
-    // Load PDF omitted...
+    // Load PDF and fit to canvas
+    fileInput.onchange = e => {
+      const file = e.target.files[0]; if (!file || file.type !== 'application/pdf') return;
+      const reader = new FileReader();
+      reader.onload = function() {
+        const u8 = new Uint8Array(this.result);
+        pdfjsLib.getDocument({ data: u8 }).promise.then(pdf => {
+          pdf.getPage(1).then(page => {
+            const vp = page.getViewport({ scale: 1 });
+            const tmp = document.createElement('canvas'); tmp.width = vp.width; tmp.height = vp.height;
+            page.render({ canvasContext: tmp.getContext('2d'), viewport: vp }).promise.then(() => {
+              const container = document.getElementById('canvas-container');
+              const cw = container.clientWidth; const ch = container.clientHeight;
+              const scale = Math.min(cw / tmp.width, ch / tmp.height);
+              canvas.setWidth(tmp.width * scale); canvas.setHeight(tmp.height * scale);
+              fabric.Image.fromURL(tmp.toDataURL(), img => {
+                img.set({ originX: 'left', originY: 'top' }); img.scale(scale);
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+              });
+            });
+          });
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    };
 
     // Canvas events
     canvas.on('mouse:down', opt => {
