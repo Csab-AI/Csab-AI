@@ -91,7 +91,12 @@
     drawBtn.onclick = () => { mode = 'draw'; canvas.isDrawingMode = true; addingText = addingPostIt = false; };
     panBtn.onclick = () => { mode = 'pan'; canvas.isDrawingMode = false; addingText = addingPostIt = false; };
     textBtn.onclick = () => { mode = 'text'; addingText = !addingText; addingPostIt = false; canvas.isDrawingMode = false; };
-    postitBtn.onclick = () => { mode = 'postit'; addingPostIt = !addingPostIt; addingText = false; canvas.isDrawingMode = false; };
+    // Initiate Post-it flow: show form first
+    postitBtn.onclick = () => {
+      // Reset form
+      form.reset();
+      overlay.style.display = modal.style.display = 'block';
+    };
     colorPicker.onchange = e => canvas.freeDrawingBrush.color = e.target.value;
     strokeWidth.onchange = e => canvas.freeDrawingBrush.width = parseInt(e.target.value, 10) || 1;
 
