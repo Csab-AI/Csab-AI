@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; }
+    #toolbar { position: fixed; top: 0; left: 0; right: 200px; background: #f4f4f4; padding: 8px; z-index: 100; display: flex; align-items: center; gap: 8px; overflow-x: auto; }
+    #toolbar button, #toolbar input, #toolbar select { padding: 4px; }
+    #stats-panel { position: fixed; top: 0; right: 0; width: 200px; bottom: 0; background: #fff; border-left: 1px solid #ccc; padding: 8px; font-size: 12px; overflow-y: auto; }
+    #canvas-container { position: absolute; top: 48px; left: 0; right: 200px; bottom: 0; }
+    canvas { border: 1px solid #ccc; display: block; }
+    /* Modal overlay and form */
+    #modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; z-index: 200; }
+    #modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: none; z-index: 201; width: 320px; }
+    #modal h3 { margin-top: 0; }
+    #modal label { display: block; margin: 8px 0 4px; }
+    #modal input, #modal textarea, #modal select { width: 100%; box-sizing: border-box; }
+    #modal textarea { resize: vertical; }
+    #modal .buttons { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+  </style>
+  <!-- PDF.js, Fabric.js, jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script>
+    // Set PDF.js worker source for web usage
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div id="toolbar">
+    <input type="file" id="file-input" accept="application/pdf">
+    <button id="draw-btn">Rajzolás</button>
+    <button id="pan-btn">Mozgatás</button>
+    <button id="text-btn">Felirat</button>
+    <button id="postit-btn">Post-it</button>
+    <button id="export-pdf-btn">Mentés PDF-ként</button>
+    <button id="export-summary-btn">Export Jegyzőkönyv</button>
+  </div>
+  <div id="stats-panel">
+    <h4>Pillanatkép</h4>
+    <div id="snapshot-info"></div><hr>
+    <div><strong>Post-it-ek:</strong> <span id="stat-count">0</span></div>
+    <div><strong>Felelősök:</strong></div><ul id="stat-by-responsible"></ul>
+    <div><strong>Átlag határidő:</strong> <span id="stat-avg-deadline">-</span> nap</div>
+  </div>
+  <div id="canvas-container"><canvas id="c"></canvas></div>
+
+  <!-- Modal -->
+  <div id="modal-overlay"></div>
+  <div id="modal">
+    <h3>Post-it adatok</h3>
+    <form id="postit-form">
+      <label for="header-input">Fejléc:</label>
+      <input type="text" id="header-input" required>
+      <label for="color-input">Papír szín:</label>
+      <input type="color" id="color-input" value="#ffeb3b" required>
+      <label for="akadaly-input">Akadály leírása:</label>
+      <textarea id="akadaly-input" rows="2" required></textarea>
+      <label for="kozig-input">Közreműködő:</label>
+      <input type="text" id="kozig-input" required>
+      <label for="hatarido-input">Határidő:</label>
+      <input type="date" id="hatarido-input" required>
+      <label for="helyisegcsoport-input">Helyiségcsoport:</label>
+      <input type="text" id="helyisegcsoport-input">
+      <label for="megj-input">Megjegyzés:</label>
+      <textarea id="megj-input" rows="2"></textarea>
+      <div class="buttons">
+        <button type="button" id="cancel-btn">Mégsem</button>
+        <button type="submit">Mentés</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const postItData = [];
+    let version = 1, baseTimestamp = new Date();
+
+    const canvas = new fabric.Canvas('c', { selection: false });
+    let isPanning = false, startPan = { x:0, y:0 }, addingText = false, addingPostIt = false;
+
+    canvas.isDrawingMode = true;
+    canvas.freeDrawingBrush.color = '#ff0000';
+    canvas.freeDrawingBrush.width = 2;
+
+    const fileInput = document.getElementById('file-input');
+    const drawBtn = document.getElementById('draw-btn');
+    const panBtn = document.getElementById('pan-btn');
+    const textBtn = document.getElementById('text-btn');
+    const postitBtn = document.getElementById('postit-btn');
+    const exportPdfBtn = document.getElementById('export-pdf-btn');
+    const exportSummaryBtn = document.getElementById('export-summary-btn');
+    const overlay = document.getElementById('modal-overlay');
+    const modal = document.getElementById('modal');
+    const form = document.getElementById('postit-form');
+    const headerInput = document.getElementById('header-input');
+    const colorInput = document.getElementById('color-input');
+    const akadalyInput = document.getElementById('akadaly-input');
+    const kozigInput = document.getElementById('kozig-input');
+    const hataridoInput = document.getElementById('hatarido-input');
+    const helyInput = document.getElementById('helyisegcsoport-input');
+    const megjInput = document.getElementById('megj-input');
+    const cancelBtn = document.getElementById('cancel-btn');
+
+    drawBtn.onclick = () => { canvas.isDrawingMode = true; addingText = addingPostIt = false; };
+    panBtn.onclick = () => { canvas.isDrawingMode = false; addingText = addingPostIt = false; };
+    textBtn.onclick = () => { addingText = !addingText; addingPostIt = false; canvas.isDrawingMode = false; };
+    postitBtn.onclick = () => { addingPostIt = !addingPostIt; addingText = false; canvas.isDrawingMode = false; };
+
+    let pdfImage;
+    fileInput.onchange = e => {
+      const file = e.target.files[0]; if (!file || file.type !== 'application/pdf') return;
+      const reader = new FileReader(); reader.onload = function() {
+        const u8 = new Uint8Array(this.result);
+        pdfjsLib.getDocument({ data: u8 }).promise.then(pdf => pdf.getPage(1).then(page => {
+          const vp = page.getViewport({ scale: 1.5 });
+          const tmp = document.createElement('canvas'); tmp.width = vp.width; tmp.height = vp.height;
+          page.render({ canvasContext: tmp.getContext('2d'), viewport: vp }).promise.then(() => {
+            const dataUrl = tmp.toDataURL();
+            fabric.Image.fromURL(dataUrl, img => {
+              pdfImage = img;
+              canvas.setWidth(img.width); canvas.setHeight(img.height);
+              canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), { originX: 'left', originY: 'top' });
+            });
+          });
+        }));
+      }; reader.readAsArrayBuffer(file);
+    };
+
+    let pendingPoint;
+    canvas.on('mouse:down', opt => {
+      const e = opt.e, p = canvas.getPointer(e);
+      if (addingPostIt) { pendingPoint = p; showModal(); }
+      else if (addingText) { const txt = prompt('Add meg a szöveget:'); if (txt) canvas.add(new fabric.Textbox(txt, { left: p.x, top: p.y, fill: '#000', fontSize: 16 })); addingText = false; }
+      else if (!canvas.isDrawingMode && e.button === 1) { isPanning = true; startPan = { x: e.clientX, y: e.clientY }; }
+    });
+    canvas.on('mouse:move', opt => {
+      if (isPanning) {
+        const e = opt.e, vpt = canvas.viewportTransform;
+        vpt[4] += e.clientX - startPan.x;
+        vpt[5] += e.clientY - startPan.y;
+        canvas.renderAll();
+        startPan = { x: e.clientX, y: e.clientY };
+      }
+    });
+    canvas.on('mouse:up', () => isPanning = false);
+    canvas.on('mouse:wheel', opt => {
+      const delta = opt.e.deltaY;
+      let zoom = canvas.getZoom() * Math.pow(0.999, delta);
+      zoom = Math.min(Math.max(zoom, 0.5), 20);
+      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+      opt.e.preventDefault(); opt.e.stopPropagation();
+    });
+
+    function showModal() { overlay.style.display = modal.style.display = 'block'; }
+    function hideModal() { overlay.style.display = modal.style.display = 'none'; addingPostIt = false; }
+    cancelBtn.onclick = hideModal;
+
+    form.onsubmit = e => {
+      e.preventDefault();
+      const header = headerInput.value, color = colorInput.value;
+      const akadaly = akadalyInput.value, kozig = kozigInput.value;
+      const hatarido = hataridoInput.value, hely = helyInput.value;
+      const megj = megjInput.value, p = pendingPoint;
+      const w = 200, h = 180;
+      const rect = new fabric.Rect({ left: p.x, top: p.y, width: w, height: h, fill: color, stroke: '#333', strokeWidth: 1, rx: 4, ry: 4 });
+      const head = new fabric.Text(header, { left: p.x+8, top: p.y+8, fontSize: 14, fontWeight: 'bold', fill: '#000' });
+      const lines = [
+        `1. Leírás: ${akadaly}`,
+        `2. Közreműködő: ${kozig}`,
+        `3. Határidő: ${hatarido}`,
+        `4. Helyiségcsoport: ${hely}`,
+        `5. Megjegyzés: ${megj}`
+      ];
+      const body = new fabric.Textbox(lines.join('\n'), { left: p.x+8, top: p.y+8+head.height+6, width: w-16, fontSize: 12, fill: '#000' });
+      const group = new fabric.Group([rect, head, body], { left: p.x, top: p.y, hasBorders: true, hasControls: true });
+      group.data = { header, akadaly, kozig, hatarido, helyisegcsoport: hely, megjegyzes: megj };
+      canvas.add(group); postItData.push(group.data); hideModal(); updateStats();
+    };
+
+    function updateStats() {
+      document.getElementById('snapshot-info').textContent = baseTimestamp.toLocaleString() + ' v' + version;
+      document.getElementById('stat-count').textContent = postItData.length;
+      const byResp = {};
+      postItData.forEach(d => byResp[d.kozig] = (byResp[d.kozig]||0) + 1);
+      const ul = document.getElementById('stat-by-responsible'); ul.innerHTML = '';
+      Object.entries(byResp).forEach(([r, c]) => { const li = document.createElement('li'); li.textContent = `${r}: ${c}`; ul.appendChild(li); });
+      const now = new Date();
+      const diffs = postItData.map(d => (new Date(d.hatarido) - now) / (1000*60*60*24)).filter(x => !isNaN(x));
+      const avg = diffs.length ? (diffs.reduce((a,b)=>a+b,0)/diffs.length).toFixed(1) : '-';
+      document.getElementById('stat-avg-deadline').textContent = avg;
+    }
+
+    exportSummaryBtn.onclick = () => {
+      const lines = ['# Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];
+      postItData.forEach((d,i) => {
+        lines.push('## '+(i+1)+'. '+d.header);
+        lines.push('- **Akadály:** '+d.akadaly);
+        lines.push('- **Közreműködő:** '+d.kozig);
+        lines.push('- **Határidő:** '+d.hatarido);
+        lines.push('- **Helyiségcsoport:** '+(d.helyisegcsoport||'-'));
+        lines.push('- **Megjegyzés:** '+(d.megjegyzes||'-')); lines.push('');
+      });
+      const blob = new Blob([lines.join('\n')], {type:'text/markdown'});
+      const url = URL.createObjectURL(blob); const a = document.createElement('a');
+      a.href = url; a.download = 'jegyzokonyv_v'+version+'.md'; a.click(); URL.revokeObjectURL(url);
+      version++; baseTimestamp = new Date(); updateStats();
+    };
+
+    exportPdfBtn.onclick = () => {
+      const dataUrl = canvas.toDataURL({format:'png',multiplier:2});
+      const pdf = new jsPDF({unit:'pt',format:[canvas.width,canvas.height]});
+      pdf.addImage(dataUrl,'PNG',0,0,canvas.width,canvas.height);
+      pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
+    };
+
+  </script>
+</body>
+</html>
