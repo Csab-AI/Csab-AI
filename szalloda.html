@@ -2,120 +2,50 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>13PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- SheetJS for future Excel export, can be removed if not used -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    :root {
-      --toolbar-bg: #f4f4f4;
-      --primary: #2196f3;
-      --primary-hover: #1769aa;
-      --modal-bg: #fff;
-      --modal-overlay: rgba(0,0,0,0.5);
-      --btn-radius: 5px;
-      --btn-padding: 7px 13px;
-      --shadow: 0 2px 12px rgba(0,0,0,0.09);
-    }
-    body, html {
-      margin:0; padding:0; height:100%; width:100%; overflow:hidden; font-family:sans-serif;
-      background: #f7fafd;
-    }
-    #toolbar {
-      position:fixed; top:0; left:0; right:200px;
-      background:var(--toolbar-bg); padding:10px 8px 10px 12px;
-      z-index:300;
-      display:flex; align-items:center; gap:8px; overflow-x:auto;
-      box-shadow: var(--shadow);
-    }
+    body, html { margin:0; padding:0; height:100%; width:100%; overflow:hidden; font-family:sans-serif; background: #f7fafd;}
+    #toolbar { position:fixed; top:0; left:0; right:200px; background:#f4f4f4; padding:10px 8px 10px 12px;
+      z-index:300; display:flex; align-items:center; gap:8px; overflow-x:auto; box-shadow:0 2px 12px rgba(0,0,0,0.09);}
     #toolbar button, #toolbar input[type="color"], #toolbar input[type="number"], #toolbar label, #toolbar select {
-      padding:var(--btn-padding);
-      border:none; border-radius:var(--btn-radius);
-      background:#fff; cursor:pointer; transition:background 0.13s,box-shadow 0.13s;
-      font-size:1em; outline:none;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-    }
+      padding:7px 13px; border:none; border-radius:5px; background:#fff; cursor:pointer;
+      transition:background 0.13s,box-shadow 0.13s; font-size:1em; outline:none; box-shadow: 0 1px 3px rgba(0,0,0,0.04);}
     #toolbar button.active, #toolbar button:focus, #toolbar button:hover {
-      background:var(--primary); color:#fff; box-shadow: 0 1px 4px rgba(33,150,243,0.08);
-    }
+      background:#2196f3; color:#fff; box-shadow: 0 1px 4px rgba(33,150,243,0.08);}
     #toolbar input[type="color"] { padding:2px 4px; width:2em; height:2em;}
     #toolbar label { font-weight:500; margin-right:4px;}
-    #project-name-wrap {
-      display:inline-flex;align-items:center; gap:6px; background:#e3eaf7; border-radius:4px;
-      padding:3px 8px 3px 6px; margin-left:12px; margin-right:2px;
-    }
+    #project-name-wrap { display:inline-flex;align-items:center; gap:6px; background:#e3eaf7; border-radius:4px;
+      padding:3px 8px 3px 6px; margin-left:12px; margin-right:2px;}
     #project-name-edit {
-      font-weight: bold; border: none; background: transparent; outline: none;
-      font-size:1em; border-bottom:2px solid #b2cdf9;
-      padding:1px 4px 1px 2px; text-transform:uppercase;
-      min-width:110px; max-width:180px;
-    }
-    #project-pencil {
-      font-size:1em; cursor:pointer; color:#888;
-      margin-left:2px;
-      transition:color 0.15s;
-    }
+      font-weight: bold; border: none; background: transparent; outline: none; font-size:1em;
+      border-bottom:2px solid #b2cdf9; padding:1px 4px 1px 2px; text-transform:uppercase;
+      min-width:110px; max-width:180px;}
+    #project-pencil { font-size:1em; cursor:pointer; color:#888; margin-left:2px; transition:color 0.15s;}
     #project-pencil:hover { color:#2196f3;}
-    #stats-panel {
-      position:fixed; top:0; right:0; width:200px; bottom:0; background:#fff;
+    #stats-panel { position:fixed; top:0; right:0; width:200px; bottom:0; background:#fff;
       border-left:1px solid #e1e1e1; padding:13px 8px 8px 16px; font-size:13px; overflow-y:auto; z-index:300;
-      box-shadow: -1px 0 9px rgba(0,0,0,0.03);
-    }
-    #canvas-container {
-      position:absolute; top:58px; left:0; right:200px; bottom:0; z-index:100;
-      background: #fafdff;
-      overflow: hidden;
-    }
+      box-shadow: -1px 0 9px rgba(0,0,0,0.03);}
+    #canvas-container { position:absolute; top:58px; left:0; right:200px; bottom:0; z-index:100; background: #fafdff; overflow: hidden;}
     canvas { display:block; position:absolute; top:0; left:0; border:1.5px solid #d3e0ef; border-radius:6px;}
-    #modal-overlay {
-      position:fixed; top:0; left:0; right:0; bottom:0;
-      background:var(--modal-overlay); display:none; z-index:400;
-    }
-    #modal {
-      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      background:var(--modal-bg); padding:0 0 16px 0; border-radius:12px;
-      box-shadow:0 3px 24px rgba(0,0,0,0.14); display:none; z-index:401;
-      width:350px; min-width:260px;
-      border-top: 6px solid var(--modal-header, #ffd600);
-      overflow:hidden;
-    }
-    #modal h3 {
-      margin:0; padding:17px 0 12px 20px; font-size:1.18em; font-weight:bold; letter-spacing:.5px;
-      background:linear-gradient(90deg,var(--modal-header, #ffd600)20%,#f7f7d8 120%);
-      border-radius: 0 0 9px 0;
-      color: #282c34;
-      border-bottom:1px solid #eaeaea;
-    }
+    #modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; z-index:400;}
+    #modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:#fff; padding:0 0 16px 0; border-radius:12px; box-shadow:0 3px 24px rgba(0,0,0,0.14);
+      display:none; z-index:401; width:350px; min-width:260px; border-top: 6px solid var(--modal-header, #ffd600); overflow:hidden;}
+    #modal h3 { margin:0; padding:17px 0 12px 20px; font-size:1.18em; font-weight:bold; letter-spacing:.5px;
+      background:linear-gradient(90deg,var(--modal-header, #ffd600)20%,#f7f7d8 120%); border-radius: 0 0 9px 0;
+      color: #282c34; border-bottom:1px solid #eaeaea;}
     #modal label { display:block; margin:10px 0 4px 24px; font-size:.99em; }
     #modal input, #modal textarea, #modal select {
-      width:88%; margin-left:24px; margin-bottom:8px;
-      box-sizing:border-box; font-size:1em;
-      border:1px solid #c6d2ea; border-radius:6px; padding:8px 9px;
-      background:#fbfcff; resize:none;
-      transition:border 0.15s;
-    }
+      width:88%; margin-left:24px; margin-bottom:8px; box-sizing:border-box; font-size:1em;
+      border:1px solid #c6d2ea; border-radius:6px; padding:8px 9px; background:#fbfcff; resize:none; transition:border 0.15s;}
     #modal textarea { resize:vertical;}
-    #modal .buttons {
-      margin-top:14px; margin-right:18px; display:flex; justify-content:flex-end; gap:8px;
-    }
-    #modal button {
-      background:var(--primary); color:#fff; border:none; border-radius:4px;
-      padding:8px 15px; font-size:1em; font-weight:500; box-shadow:0 1px 4px rgba(33,150,243,0.09);
-      transition:background 0.13s;
-      cursor:pointer;
-    }
-    #modal button:hover { background: var(--primary-hover);}
-    /* Responsive tweaks */
-    @media (max-width:700px){
-      #toolbar {right:0;left:0;flex-wrap:wrap;gap:5px;}
-      #stats-panel { display:none;}
-      #canvas-container {right:0;}
-      #modal {width:90vw;}
-    }
-    @media (max-width:500px){
-      #toolbar {font-size: 0.93em;}
-      #modal input, #modal textarea { font-size:0.98em;}
-    }
+    #modal .buttons { margin-top:14px; margin-right:18px; display:flex; justify-content:flex-end; gap:8px;}
+    #modal button { background:#2196f3; color:#fff; border:none; border-radius:4px; padding:8px 15px; font-size:1em; font-weight:500; box-shadow:0 1px 4px rgba(33,150,243,0.09); transition:background 0.13s; cursor:pointer;}
+    #modal button:hover { background: #1769aa;}
+    @media (max-width:700px){ #toolbar {right:0;left:0;flex-wrap:wrap;gap:5px;} #stats-panel { display:none;} #canvas-container {right:0;} #modal {width:90vw;}}
+    @media (max-width:500px){ #toolbar {font-size: 0.93em;} #modal input, #modal textarea { font-size:0.98em;}}
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
@@ -167,6 +97,7 @@
     </select></label>
     <button id="export-pdf-btn" title="Mentés PDF-be">🖨️</button>
     <button id="export-summary-btn" title="Export Jegyzőkönyv">📜</button>
+    <button id="export-xlsx-btn" title="Feladatlista Excel">🧾</button>
   </div>
   <div id="stats-panel">
     <h4>Pillanatkép</h4>
@@ -218,6 +149,7 @@
     const templateSelect=document.getElementById('template-select');
     const exportPdfBtn=document.getElementById('export-pdf-btn');
     const exportSummaryBtn=document.getElementById('export-summary-btn');
+    const exportXlsxBtn=document.getElementById('export-xlsx-btn');
     const undoBtn=document.getElementById('undo-btn');
     const saveJsonBtn=document.getElementById('save-json-btn');
     const importJsonBtn=document.getElementById('import-json-btn');
@@ -333,7 +265,6 @@
             const tmp=document.createElement('canvas');tmp.width=vp.width;tmp.height=vp.height;
             page.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise.then(()=>{
               const c=document.getElementById('canvas-container');
-              // Responsive scaling!
               const scale=Math.min(
                 c.clientWidth/tmp.width,
                 c.clientHeight/tmp.height
@@ -450,18 +381,29 @@
       form.setAttribute('data-edit', 'true');
       modalHeader.textContent = "Post-it szerkesztése";
     }
+
+    // Post-it magasság automatikusan elég nagy legyen!
+    function calcPostitHeight(header, bodyLines) {
+      const headH = 28;
+      const bodyH = 16*bodyLines;
+      const padding = 20;
+      return Math.max(95, headH+bodyH+padding);
+    }
+
     form.onsubmit = function(e){
       e.preventDefault();
-      const header=document.getElementById('header-input').value;
+      const header=document.getElementById('header-input').value.toUpperCase();
       const color=document.getElementById('color-input').value;
       const akad=document.getElementById('akadaly-input').value;
       const kozg=document.getElementById('kozig-input').value;
       const hat=document.getElementById('hatarido-input').value;
       const hely=document.getElementById('helyisegcsoport-input').value;
       const meg=document.getElementById('megj-input').value;
+      const bodyLines = [akad, kozg, hat, hely, meg].map(x=>x?x.split('\n').length:1).reduce((a,b)=>a+b)+5;
+      let rectH = calcPostitHeight(header, bodyLines);
       if(form.getAttribute('data-edit') === 'true' && editingGroup) {
         editingGroup.item(0).set('fill', color);
-        editingGroup.item(1).set('text', header.toUpperCase());
+        editingGroup.item(1).set('text', header);
         editingGroup.item(2).set('text', [
           `1. Leírás: ${akad}`,
           `2. Közreműködő: ${kozg}`,
@@ -469,18 +411,27 @@
           `4. Helyiségcsoport: ${hely}`,
           `5. Megjegyzés: ${meg}`
         ].join('\n'));
-        editingGroup.data={header:header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
+        editingGroup.item(1).set({ top: editingGroup.item(0).top+10, left: editingGroup.item(0).left+13, width: editingGroup.item(0).width-18 });
+        editingGroup.item(2).set({ top: editingGroup.item(0).top+38, left: editingGroup.item(0).left+13, width: editingGroup.item(0).width-18 });
+        editingGroup.item(0).set('height', rectH);
+        editingGroup.set({ height: rectH });
+        editingGroup.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         editingGroup.setCoords();
         canvas.requestRenderAll();
         postItData = canvas.getObjects('group').map(g=>g.data);
         editingGroup = null;
       } else {
-        const p=lineStart||{x:canvas.width/2,y:canvas.height/2};
-        const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});
-        const head=new fabric.Text(header.toUpperCase(),{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});
-        const body=new fabric.Textbox([`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n'),{left:p.x+8,top:p.y+8+head.height+6,width:184,fontSize:12,fill:'#000'});
-        const group=new fabric.Group([rectPt,head,body],{left:p.x,top:p.y,hasBorders:true,hasControls:true});
-        group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};
+        const p=lineStart||{x:canvas.width/2-100,y:canvas.height/2-80};
+        const rectPt=new fabric.Rect({
+          left:0,top:0,width:240,height:rectH,fill:color,stroke:'#333',strokeWidth:1.2,rx:6,ry:6
+        });
+        const head=new fabric.Textbox(header,{left:14,top:10,fontSize:15,fontWeight:'bold',fill:'#000',width:rectPt.width-28, splitByGrapheme:true});
+        const bodyText=[`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n');
+        const body=new fabric.Textbox(bodyText,{left:14,top:38,width:rectPt.width-28,fontSize:12,fill:'#1a1a1a', splitByGrapheme:true});
+        const group=new fabric.Group([rectPt,head,body],{
+          left:p.x, top:p.y, hasBorders:true, hasControls:true, height:rectH, width:rectPt.width
+        });
+        group.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         makeGroupInteractive(group);
         canvas.add(group);
         postItData = canvas.getObjects('group').map(g=>g.data);
@@ -523,6 +474,19 @@
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');a.href=url;a.download='jegyzokonyv_v'+version+'.md';a.click();URL.revokeObjectURL(url);
       version++;baseTimestamp=new Date();updateStats();
+    };
+
+    // ========== Feladatlista Excel export ==========
+    exportXlsxBtn.onclick=()=>{
+      // Fejléc: Fejléc, Akadály, Felelős, Határidő, Helyiségcsoport, Megjegyzés
+      const wb = XLSX.utils.book_new();
+      const data = [["Fejléc", "Akadály", "Felelős", "Határidő", "Helyiségcsoport", "Megjegyzés"]];
+      postItData.forEach(d => data.push([
+        d.header, d.akadaly, d.kozig, d.hatarido, d.helyisegcsoport, d.megjegyzes
+      ]));
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, "Feladatlista");
+      XLSX.writeFile(wb, `Feladatlista_${projectName.replace(/[\s.]/g,'_')}.xlsx`);
     };
 
     // ========== PDF Export ==========
@@ -610,33 +574,14 @@
       updateStats();
     };
 
-    // ========== POST-IT interaktivitás beállítása ==========
+    // Új post-it létrehozásakor legyen interaktív!
     canvas.on('object:added', function(opt){
       if(opt && opt.target && opt.target.type==='group') makeGroupInteractive(opt.target);
     });
     canvas.getObjects('group').forEach(makeGroupInteractive);
-
     document.getElementById('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
-
-    // Always keep canvas fully filling container (resize handler)
-    function fitCanvasToContainer() {
-      const c=document.getElementById('canvas-container');
-      if(canvas.backgroundImage) {
-        const img = canvas.backgroundImage;
-        const scale=Math.min(c.clientWidth/img.width, c.clientHeight/img.height);
-        canvas.setWidth(img.width*scale);
-        canvas.setHeight(img.height*scale);
-        img.scale(scale);
-        canvas.renderAll();
-      } else {
-        canvas.setWidth(c.clientWidth);
-        canvas.setHeight(c.clientHeight);
-        canvas.renderAll();
-      }
-    }
-    window.addEventListener('resize', fitCanvasToContainer);
   </script>
 </body>
 </html>
