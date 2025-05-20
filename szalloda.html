@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>SAV_PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -51,6 +51,8 @@
     </span>
     <button id="save-version-btn">Verzió mentése</button>
     <button id="load-version-btn">Verzió visszatöltése</button>
+    <button id="import-json-btn">Verzió importálása</button>
+    <input type="file" id="import-json-file" accept="application/json" style="display:none">
     <button id="new-project-btn" style="color:#a00">Új projekt</button>
     <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
     <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
@@ -139,6 +141,8 @@
     const undoBtn=document.getElementById('undo-btn');
     const saveVersionBtn=document.getElementById('save-version-btn');
     const loadVersionBtn=document.getElementById('load-version-btn');
+    const importJsonBtn=document.getElementById('import-json-btn');
+    const importJsonFile=document.getElementById('import-json-file');
     const newProjectBtn=document.getElementById('new-project-btn');
     const overlay=document.getElementById('modal-overlay');
     const modal=document.getElementById('modal');
@@ -149,7 +153,7 @@
     const verzioCloseBtn=document.getElementById('verzio-close-btn');
     const projectNameEdit=document.getElementById('project-name-edit');
 
-    // --------- 1. Új MENTÉS funkció (méretellenőrzéssel) -----------
+    // --------- 1. Új MENTÉS funkció (méretellenőrzéssel és JSON backup-pal) -----------
     function saveProjectState(isAuto = false) {
       try {
         const now = new Date();
@@ -167,20 +171,17 @@
           localStorage.setItem(key, stateStr);
           if (!isAuto) alert('Mentés sikeres: ' + projectName + " - " + state.date);
         } else {
-          if (!isAuto) {
-            const blob = new Blob([stateStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            alert('Az adat túl nagy volt, JSON fájlba mentettük.');
-          } else {
-            console.warn("Auto-mentés túl nagy, kihagyva.");
-          }
+          // Azonnali JSON letöltés (mindig legyen fizikailag lementve!)
+          const blob = new Blob([stateStr], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json`;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)}, 1000);
+          alert('Az adat túl nagy volt, JSON fájlba mentettük. Biztonságosabb is!');
         }
-        // projectName frissítés tárolása mindig
         localStorage.setItem('pdfrajz_projectname', projectName);
       } catch (e) {
         console.error("Mentési hiba:", e);
@@ -211,8 +212,6 @@
     canvas.on('object:modified', () => saveProjectState(true));
     saveVersionBtn.onclick = () => saveProjectState(false);
     window.addEventListener('DOMContentLoaded', loadAutosave);
-
-    // -------------- Eddigi logika, csak autosave/mentés helyett új függvényeket használunk --------------
 
     // Projekt név (helyreállítás UI-ra)
     projectNameEdit.value = projectName;
@@ -528,14 +527,18 @@
       else keys.forEach(key=>{
         const meta = JSON.parse(localStorage.getItem(key));
         const li = document.createElement('li');
-        li.innerHTML = `<button data-key="${key}">Betöltés</button> <b>${meta.name||''}</b> - <span>${meta.date}</span>`;
+        li.innerHTML = `
+          <button data-key="${key}">Betöltés</button> 
+          <button data-download="${key}">Letöltés</button> 
+          <button data-delete="${key}">Törlés</button> 
+          <b>${meta.name||''}</b> - <span>${meta.date}</span>`;
         verzioList.appendChild(li);
       });
       verzioModal.style.display = 'block';
     };
     verzioList.onclick = function(e){
-      if(e.target.tagName==='BUTTON'){
-        const key = e.target.getAttribute('data-key');
+      const key = e.target.getAttribute('data-key') || e.target.getAttribute('data-download') || e.target.getAttribute('data-delete');
+      if(e.target.hasAttribute('data-key')){
         if(key && localStorage.getItem(key)){
           if(!confirm('Biztosan betölti ezt a verziót? A jelenlegi elveszik!')) return;
           const meta = JSON.parse(localStorage.getItem(key));
@@ -552,9 +555,61 @@
           verzioModal.style.display = 'none';
         }
       }
+      if(e.target.hasAttribute('data-download')){
+        if(key && localStorage.getItem(key)){
+          const meta = localStorage.getItem(key);
+          const blob = new Blob([meta], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = key + '.json';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)}, 1000);
+        }
+      }
+      if(e.target.hasAttribute('data-delete')){
+        if(key && localStorage.getItem(key)){
+          if(confirm("Biztosan törli ezt a verziót?")) {
+            localStorage.removeItem(key);
+            e.target.parentElement.remove();
+          }
+        }
+      }
     };
     verzioCloseBtn.onclick = function() {
       verzioModal.style.display = 'none';
+    };
+
+    // --- VERZIÓ IMPORT JSON-ból ---
+    importJsonBtn.onclick = function() {
+      importJsonFile.value = '';
+      importJsonFile.click();
+    };
+    importJsonFile.onchange = function(e){
+      const f = e.target.files[0];
+      if(!f) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        try {
+          const data = JSON.parse(ev.target.result);
+          if(!data.canvas) throw new Error('Hibás JSON állomány!');
+          projectName = data.name || "Névtelen projekt";
+          projectNameEdit.value = projectName;
+          localStorage.setItem('pdfrajz_projectname', projectName);
+          canvas.loadFromJSON(data.canvas, function() {
+            canvas.renderAll();
+            canvas.getObjects('group').forEach(makeGroupInteractive);
+            postItData = canvas.getObjects('group').map(g=>g.data);
+            updateStats();
+            saveProjectState(true);
+          });
+          alert('Verzió sikeresen importálva!');
+        } catch (e) {
+          alert('Hibás vagy sérült JSON állomány!');
+        }
+      };
+      reader.readAsText(f);
     };
 
     // --- ÚJ PROJEKT ---
