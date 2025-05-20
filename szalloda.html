@@ -2,161 +2,121 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>PDF Rajzoló & Post-it</title>
+  <title>13PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Google Fonts: Inter -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <!-- SheetJS for future Excel export, can be removed if not used -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
-      --primary: #2563eb;
-      --primary-dark: #1e40af;
-      --bg: #f8fafc;
-      --modal-header: #ffd600;
+      --toolbar-bg: #f4f4f4;
+      --primary: #2196f3;
+      --primary-hover: #1769aa;
+      --modal-bg: #fff;
+      --modal-overlay: rgba(0,0,0,0.5);
+      --btn-radius: 5px;
+      --btn-padding: 7px 13px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.09);
     }
-    html, body {
-      margin:0; padding:0; height:100%; width:100%;
-      font-family: 'Inter', Arial, sans-serif;
-      background: var(--bg);
-      color: #18202b;
-      letter-spacing: 0.01em;
+    body, html {
+      margin:0; padding:0; height:100%; width:100%; overflow:hidden; font-family:sans-serif;
+      background: #f7fafd;
     }
     #toolbar {
-      position: fixed; top: 0; left: 0; right: 220px; z-index: 300;
-      background: #fff;
-      padding: 12px 20px 12px 14px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-      border-bottom: 1px solid #e2e8f0;
-      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      position:fixed; top:0; left:0; right:200px;
+      background:var(--toolbar-bg); padding:10px 8px 10px 12px;
+      z-index:300;
+      display:flex; align-items:center; gap:8px; overflow-x:auto;
+      box-shadow: var(--shadow);
     }
-    #toolbar label, #toolbar select {
-      font-size: 0.98em;
-      font-weight: 500;
+    #toolbar button, #toolbar input[type="color"], #toolbar input[type="number"], #toolbar label, #toolbar select {
+      padding:var(--btn-padding);
+      border:none; border-radius:var(--btn-radius);
+      background:#fff; cursor:pointer; transition:background 0.13s,box-shadow 0.13s;
+      font-size:1em; outline:none;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
-    #toolbar button, #toolbar select, #toolbar input[type="color"], #toolbar input[type="number"] {
-      background: #f8fafc;
-      border: 1px solid #d1d5db;
-      border-radius: 7px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-      height: 38px; min-width:38px; padding: 0 13px;
-      font-family: inherit; font-size: 1em;
-      transition: background 0.16s, color 0.13s, box-shadow 0.16s;
-      outline: none;
-      cursor: pointer;
+    #toolbar button.active, #toolbar button:focus, #toolbar button:hover {
+      background:var(--primary); color:#fff; box-shadow: 0 1px 4px rgba(33,150,243,0.08);
     }
-    #toolbar button:not(:disabled):hover, #toolbar button.active {
-      background: var(--primary);
-      color: #fff;
-      box-shadow: 0 2px 10px rgba(37,99,235,0.09);
-    }
-    #toolbar button:disabled { opacity: 0.7; cursor: not-allowed;}
-    #toolbar select:focus, #toolbar input[type="number"]:focus { border-color: var(--primary); }
+    #toolbar input[type="color"] { padding:2px 4px; width:2em; height:2em;}
+    #toolbar label { font-weight:500; margin-right:4px;}
     #project-name-wrap {
-      display:flex;align-items:center;gap:5px; margin-left:6px;
-      padding: 2px 8px 2px 2px; border-radius: 6px;
-      background: #f3f4f6;
-      min-width: 160px;
+      display:inline-flex;align-items:center; gap:6px; background:#e3eaf7; border-radius:4px;
+      padding:3px 8px 3px 6px; margin-left:12px; margin-right:2px;
     }
     #project-name-edit {
-      font-weight:600; border:none; background:transparent; outline:none;
-      font-size:1em; padding:4px 0 4px 2px; min-width:120px; text-transform:uppercase;
-      border-bottom:2px solid #a0aec0;
-      letter-spacing:0.06em; transition: border-color 0.17s;
+      font-weight: bold; border: none; background: transparent; outline: none;
+      font-size:1em; border-bottom:2px solid #b2cdf9;
+      padding:1px 4px 1px 2px; text-transform:uppercase;
+      min-width:110px; max-width:180px;
     }
-    #project-name-edit:focus { border-color: var(--primary);}
     #project-pencil {
-      font-size:1.13em;color:#787878;cursor:pointer; margin-left:-3px;
-      opacity:.85; transition:color 0.13s;
+      font-size:1em; cursor:pointer; color:#888;
+      margin-left:2px;
+      transition:color 0.15s;
     }
-    #project-pencil:hover { color:var(--primary);}
+    #project-pencil:hover { color:#2196f3;}
     #stats-panel {
-      position:fixed; top:0; right:0; width:220px; bottom:0; background:#fcfcfd;
-      border-left:1px solid #dbeafe; padding:14px 16px 10px 16px; font-size:13px; overflow-y:auto; z-index:300;
-      box-shadow: -3px 0 18px rgba(0,0,0,0.03);
-    }
-    #stats-panel h4 {
-      font-weight:600; color:var(--primary-dark); letter-spacing:0.02em; font-size:1.13em;
-      margin:0 0 10px 0; border-bottom:1.5px solid #dbeafe; padding-bottom:2px;
+      position:fixed; top:0; right:0; width:200px; bottom:0; background:#fff;
+      border-left:1px solid #e1e1e1; padding:13px 8px 8px 16px; font-size:13px; overflow-y:auto; z-index:300;
+      box-shadow: -1px 0 9px rgba(0,0,0,0.03);
     }
     #canvas-container {
-      position:absolute; top:62px; left:0; right:220px; bottom:0; z-index:100;
-      background: #f5f7fb;
+      position:absolute; top:58px; left:0; right:200px; bottom:0; z-index:100;
+      background: #fafdff;
+      overflow: hidden;
     }
-    canvas { border:1.5px solid #cbd5e1; background: #fff; display:block; border-radius:9px;}
+    canvas { display:block; position:absolute; top:0; left:0; border:1.5px solid #d3e0ef; border-radius:6px;}
     #modal-overlay {
       position:fixed; top:0; left:0; right:0; bottom:0;
-      background:rgba(30,41,59,0.18); display:none; z-index:400;
+      background:var(--modal-overlay); display:none; z-index:400;
     }
     #modal {
       position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      background:#fff; min-width:335px; max-width:95vw;
-      border-radius:13px; box-shadow:0 7px 40px rgba(30,41,59,0.19);
-      display:none; z-index:401; 
-      padding: 0 0 20px 0;
-      border-top: 7px solid var(--modal-header, #ffd600);
-      transition: border-color 0.18s;
+      background:var(--modal-bg); padding:0 0 16px 0; border-radius:12px;
+      box-shadow:0 3px 24px rgba(0,0,0,0.14); display:none; z-index:401;
+      width:350px; min-width:260px;
+      border-top: 6px solid var(--modal-header, #ffd600);
       overflow:hidden;
     }
-    #modal-header {
-      font-size: 1.13em; font-weight: 600;
-      text-align: left; padding: 17px 24px 0 24px;
-      letter-spacing: 0.05em;
+    #modal h3 {
+      margin:0; padding:17px 0 12px 20px; font-size:1.18em; font-weight:bold; letter-spacing:.5px;
+      background:linear-gradient(90deg,var(--modal-header, #ffd600)20%,#f7f7d8 120%);
+      border-radius: 0 0 9px 0;
+      color: #282c34;
+      border-bottom:1px solid #eaeaea;
     }
-    #modal form {
-      padding: 10px 24px 6px 24px;
-      display: flex; flex-direction: column; gap: 7px;
-    }
-    #modal label {
-      font-weight:500; margin: 11px 0 4px 0;
-      font-size: .99em;
-    }
+    #modal label { display:block; margin:10px 0 4px 24px; font-size:.99em; }
     #modal input, #modal textarea, #modal select {
-      border:1px solid #d1d5db; border-radius:7px;
-      padding:7px 8px; background:#f9fafb;
-      font-size:1em;
-      margin-bottom:2px;
-      transition:border-color .16s;
-      font-family:inherit;
+      width:88%; margin-left:24px; margin-bottom:8px;
+      box-sizing:border-box; font-size:1em;
+      border:1px solid #c6d2ea; border-radius:6px; padding:8px 9px;
+      background:#fbfcff; resize:none;
+      transition:border 0.15s;
     }
-    #modal textarea { resize:vertical; min-height:44px; }
-    #modal input:focus, #modal textarea:focus, #modal select:focus { border-color:var(--primary);}
-    #modal .buttons { margin-top:13px; display:flex; justify-content:flex-end; gap:10px;}
-    #modal .buttons button {
-      border-radius: 6px; font-size:1em; padding: 6px 20px;
-      border:none; font-weight:500;
-      background: #e0e7ef; color: #28313e;
-      box-shadow:0 1px 3px rgba(0,0,0,0.07);
-      transition: background 0.13s, color 0.13s, box-shadow 0.14s;
+    #modal textarea { resize:vertical;}
+    #modal .buttons {
+      margin-top:14px; margin-right:18px; display:flex; justify-content:flex-end; gap:8px;
+    }
+    #modal button {
+      background:var(--primary); color:#fff; border:none; border-radius:4px;
+      padding:8px 15px; font-size:1em; font-weight:500; box-shadow:0 1px 4px rgba(33,150,243,0.09);
+      transition:background 0.13s;
       cursor:pointer;
     }
-    #modal .buttons button:hover {
-      background: var(--primary);
-      color:#fff;
-      box-shadow: 0 1px 10px rgba(37,99,235,0.11);
+    #modal button:hover { background: var(--primary-hover);}
+    /* Responsive tweaks */
+    @media (max-width:700px){
+      #toolbar {right:0;left:0;flex-wrap:wrap;gap:5px;}
+      #stats-panel { display:none;}
+      #canvas-container {right:0;}
+      #modal {width:90vw;}
     }
-    /* Responsive: mobilon alul legyen a toolbar, grid-el */
-    @media (max-width: 900px) {
-      #toolbar { right:0; left:0; top:auto; bottom:0; flex-wrap:wrap;
-        border-bottom:none; border-top:1.5px solid #e2e8f0;
-        box-shadow: 0 -2px 18px rgba(0,0,0,0.10);
-        justify-content:flex-start;
-      }
-      #stats-panel { position:fixed; width:100vw; left:0; right:0; top:auto; bottom:62px; min-width:0; }
-      #canvas-container { top:0; left:0; right:0; bottom:62px;}
-      #modal { min-width:95vw; }
-    }
-    /* Grid gomb elrendezés mobilon */
-    @media (max-width: 680px) {
-      #toolbar {
-        display: grid; grid-template-columns: repeat(2, 1fr);
-        gap: 7px 10px; padding: 8px 6px 7px 6px;
-      }
-      #toolbar label, #toolbar button, #toolbar select, #toolbar input[type="color"], #toolbar input[type="number"] {
-        min-width: 90px; width: 99%; max-width: 98vw;
-      }
+    @media (max-width:500px){
+      #toolbar {font-size: 0.93em;}
+      #modal input, #modal textarea { font-size:0.98em;}
     }
   </style>
-  <!-- Font Awesome for icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js"></script>
@@ -164,24 +124,25 @@
 </head>
 <body>
   <div id="toolbar">
-    <button id="draw-btn" title="Szabadkézi"><i class="fa fa-pen"></i></button>
-    <button id="line-btn" title="Vonal"><i class="fa fa-minus"></i></button>
-    <button id="rect-btn" title="Téglalap"><i class="fa-regular fa-square"></i></button>
-    <button id="select-btn" title="Kijelölés"><i class="fa-regular fa-arrow-pointer"></i></button>
-    <button id="pan-btn" title="Mozgatás / zoom"><i class="fa fa-arrows-alt"></i></button>
-    <button id="undo-btn" title="Visszavonás"><i class="fa fa-undo"></i></button>
-    <div id="project-name-wrap">
+    <input type="file" id="file-input" accept="application/pdf" title="PDF háttér betöltése">
+    <button id="draw-btn" title="Szabadkézi rajz">✏️</button>
+    <button id="line-btn" title="Vonal">/</button>
+    <button id="rect-btn" title="Téglalap">▭</button>
+    <button id="select-btn" title="Kijelölés/mozgatás">🔲</button>
+    <button id="pan-btn" title="Mozgatás, nagyítás">🤚</button>
+    <button id="undo-btn" title="Visszavonás">⤺</button>
+    <span id="project-name-wrap">
       <input id="project-name-edit" title="Projekt neve szerkeszthető" value="NÉVTELEN PROJEKT">
-      <span id="project-pencil" title="Projekt név szerkesztése"><i class="fa fa-pen"></i></span>
-    </div>
-    <button id="save-json-btn" title="Mentés JSON-ba"><i class="fa fa-download"></i> Mentés</button>
-    <button id="import-json-btn" title="JSON visszatöltés"><i class="fa fa-upload"></i> Betöltés</button>
+      <span id="project-pencil" title="Szerkesztés">🖉</span>
+    </span>
+    <button id="save-json-btn" title="Mentés JSON-ba">💾</button>
+    <button id="import-json-btn" title="JSON visszatöltés">📁</button>
     <input type="file" id="import-json-file" accept="application/json" style="display:none">
-    <button id="new-project-btn" title="Új projekt" style="color:#a00"><i class="fa fa-file-circle-plus"></i></button>
-    <label title="Szín"><i class="fa fa-palette"></i> <input type="color" id="color-picker" value="#ff0000"></label>
-    <label title="Vastagság"><i class="fa fa-arrows-left-right-to-line"></i> <input type="number" id="stroke-width" value="2" min="1" max="20"></label>
-    <button id="text-btn" title="Felirat"><i class="fa fa-font"></i></button>
-    <button id="postit-btn" title="Post-it"><i class="fa fa-sticky-note"></i></button>
+    <button id="new-project-btn" style="color:#a00" title="Új projekt">🆕</button>
+    <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
+    <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
+    <button id="text-btn" title="Felirat">🔤</button>
+    <button id="postit-btn" title="Post-it">🗒️</button>
     <label>Sablon:<select id="template-select">
       <option>Megrendelő pénzügyi</option>
       <option>Megrendelő műszaki</option>
@@ -204,10 +165,8 @@
       <option>Üres 5</option>
       <option>Egyéni</option>
     </select></label>
-    <button id="export-pdf-btn" title="Mentés PDF-be"><i class="fa fa-file-pdf"></i></button>
-    <button id="export-summary-btn" title="Export Jegyzőkönyv"><i class="fa fa-list-ul"></i></button>
-    <button id="pdf-upload-btn" title="PDF háttér betöltése"><i class="fa fa-file-import"></i></button>
-    <input type="file" id="file-input" accept="application/pdf" style="display:none">
+    <button id="export-pdf-btn" title="Mentés PDF-be">🖨️</button>
+    <button id="export-summary-btn" title="Export Jegyzőkönyv">📜</button>
   </div>
   <div id="stats-panel">
     <h4>Pillanatkép</h4>
@@ -218,7 +177,7 @@
   <div id="canvas-container"><canvas id="c"></canvas></div>
   <div id="modal-overlay"></div>
   <div id="modal">
-    <div id="modal-header" style="background:transparent;">Post-it adatok</div>
+    <h3 id="modal-header">Post-it adatok</h3>
     <form id="postit-form" autocomplete="off">
       <label>Fejléc:<input type="text" id="header-input" required style="text-transform:uppercase"></label>
       <label>Papír szín:<input type="color" id="color-input" value="#ffeb3b" required></label>
@@ -247,8 +206,6 @@
 
     // UI refs
     const fileInput=document.getElementById('file-input');
-    const pdfUploadBtn=document.getElementById('pdf-upload-btn');
-    pdfUploadBtn.onclick = ()=>fileInput.click();
     const drawBtn=document.getElementById('draw-btn');
     const lineBtn=document.getElementById('line-btn');
     const rectBtn=document.getElementById('rect-btn');
@@ -274,7 +231,7 @@
     const projectPencil=document.getElementById('project-pencil');
     const modalHeader=document.getElementById('modal-header');
 
-    // Project name UX
+    // Projekt név auto-uppercase
     projectNameEdit.value = projectName;
     projectNameEdit.oninput = function(){
       this.value = this.value.toUpperCase();
@@ -361,31 +318,42 @@
         }
       });
     }
-
     colorPicker.onchange=e=>canvas.freeDrawingBrush.color=e.target.value;
     strokeWidth.onchange=e=>canvas.freeDrawingBrush.width=parseInt(e.target.value,10)||1;
 
-    // PDF háttér betöltés
+    // ========== PDF háttér feltöltés ==========
     fileInput.onchange=e=>{
       const f=e.target.files[0]; if(!f||f.type!=='application/pdf')return;
-      const r=new FileReader();r.onload=function(){
+      const r=new FileReader();
+      r.onload=function(){
         const u8=new Uint8Array(this.result);
-        pdfjsLib.getDocument({data:u8}).promise.then(pdf=>pdf.getPage(1).then(page=>{
-          const vp=page.getViewport({scale:1});
-          const tmp=document.createElement('canvas');tmp.width=vp.width;tmp.height=vp.height;
-          page.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise.then(()=>{
-            const c=document.getElementById('canvas-container');
-            const scale=Math.min(c.clientWidth/tmp.width,c.clientHeight/tmp.height);
-            canvas.setWidth(tmp.width*scale);canvas.setHeight(tmp.height*scale);
-            fabric.Image.fromURL(tmp.toDataURL(),img=>{
-              img.set({originX:'left',originY:'top'});img.scale(scale);
-              canvas.setBackgroundImage(img,canvas.renderAll.bind(canvas));
+        pdfjsLib.getDocument({data:u8}).promise.then(pdf=>
+          pdf.getPage(1).then(page=>{
+            const vp=page.getViewport({scale:1});
+            const tmp=document.createElement('canvas');tmp.width=vp.width;tmp.height=vp.height;
+            page.render({canvasContext:tmp.getContext('2d'),viewport:vp}).promise.then(()=>{
+              const c=document.getElementById('canvas-container');
+              // Responsive scaling!
+              const scale=Math.min(
+                c.clientWidth/tmp.width,
+                c.clientHeight/tmp.height
+              );
+              canvas.setWidth(tmp.width*scale);
+              canvas.setHeight(tmp.height*scale);
+              fabric.Image.fromURL(tmp.toDataURL(),img=>{
+                img.set({originX:'left',originY:'top'});
+                img.scale(scale);
+                canvas.setBackgroundImage(img,()=>{
+                  canvas.renderAll();
+                });
+              });
             });
-          });
-        }));
+          })
+        );
       };r.readAsArrayBuffer(f);
     };
 
+    // ========== Canvas Interaction ==========
     let isDragging=false, lastPosX=0, lastPosY=0;
     canvas.on('mouse:down',opt=>{
       const e=opt.e, p=canvas.getPointer(e);
@@ -448,6 +416,7 @@
       }
     });
 
+    // ========== Post-it létrehozás/interaktivitás ==========
     function makeGroupInteractive(group) {
       group.set({
         hasBorders: true,
@@ -466,12 +435,9 @@
         }
       });
     }
-
     let editingGroup = null;
     function openEditPostitModal(group) {
       editingGroup = group;
-      modal.style.setProperty('--modal-header', group.item(0).get('fill')||'#ffd600');
-      modalHeader.textContent = "Post-it szerkesztése";
       document.getElementById('header-input').value = group.data.header || "";
       document.getElementById('color-input').value = group.item(0).get('fill');
       document.getElementById('akadaly-input').value = group.data.akadaly || "";
@@ -479,10 +445,11 @@
       document.getElementById('hatarido-input').value = group.data.hatarido || "";
       document.getElementById('helyisegcsoport-input').value = group.data.helyisegcsoport || "";
       document.getElementById('megj-input').value = group.data.megjegyzes || "";
+      modal.style.setProperty('--modal-header', group.item(0).get('fill') || '#ffd600');
       overlay.style.display=modal.style.display='block';
       form.setAttribute('data-edit', 'true');
+      modalHeader.textContent = "Post-it szerkesztése";
     }
-
     form.onsubmit = function(e){
       e.preventDefault();
       const header=document.getElementById('header-input').value;
@@ -492,11 +459,9 @@
       const hat=document.getElementById('hatarido-input').value;
       const hely=document.getElementById('helyisegcsoport-input').value;
       const meg=document.getElementById('megj-input').value;
-      modal.style.setProperty('--modal-header', color);
-
       if(form.getAttribute('data-edit') === 'true' && editingGroup) {
         editingGroup.item(0).set('fill', color);
-        editingGroup.item(1).set('text', header);
+        editingGroup.item(1).set('text', header.toUpperCase());
         editingGroup.item(2).set('text', [
           `1. Leírás: ${akad}`,
           `2. Közreműködő: ${kozg}`,
@@ -504,22 +469,16 @@
           `4. Helyiségcsoport: ${hely}`,
           `5. Megjegyzés: ${meg}`
         ].join('\n'));
-        editingGroup.data={header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
+        editingGroup.data={header:header, akadaly:akad, kozig:kozg, hatarido:hat, helyisegcsoport:hely, megjegyzes:meg};
         editingGroup.setCoords();
         canvas.requestRenderAll();
         postItData = canvas.getObjects('group').map(g=>g.data);
         editingGroup = null;
       } else {
         const p=lineStart||{x:canvas.width/2,y:canvas.height/2};
-        const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:5,ry:5});
-        const head=new fabric.Text(header,{left:p.x+10,top:p.y+11,fontSize:15,fontWeight:'bold',fill:'#111'});
-        const body=new fabric.Textbox([
-          `1. Leírás: ${akad}`,
-          `2. Közreműködő: ${kozg}`,
-          `3. Határidő: ${hat}`,
-          `4. Helyiségcsoport: ${hely}`,
-          `5. Megjegyzés: ${meg}`].join('\n'),
-          {left:p.x+10,top:p.y+12+head.height+6,width:178,fontSize:12,fill:'#333'});
+        const rectPt=new fabric.Rect({left:p.x,top:p.y,width:200,height:180,fill:color,stroke:'#333',strokeWidth:1,rx:4,ry:4});
+        const head=new fabric.Text(header.toUpperCase(),{left:p.x+8,top:p.y+8,fontSize:14,fontWeight:'bold',fill:'#000'});
+        const body=new fabric.Textbox([`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n'),{left:p.x+8,top:p.y+8+head.height+6,width:184,fontSize:12,fill:'#000'});
         const group=new fabric.Group([rectPt,head,body],{left:p.x,top:p.y,hasBorders:true,hasControls:true});
         group.data={header:header,akadaly:akad,kozig:kozg,hatarido:hat,helyisegcsoport:hely,megjegyzes:meg};
         makeGroupInteractive(group);
@@ -532,6 +491,7 @@
     };
     cancelBtn.onclick=()=>{overlay.style.display=modal.style.display='none'; form.removeAttribute('data-edit'); editingGroup=null;};
 
+    // ========== Statisztika panel ==========
     function updateStats(){
       document.getElementById('snapshot-info').textContent=projectName+" | "+baseTimestamp.toLocaleString()+' v'+version;
       document.getElementById('stat-count').textContent=postItData.length;
@@ -547,6 +507,7 @@
     }
     updateStats();
 
+    // ========== Export summary markdown ==========
     exportSummaryBtn.onclick=()=>{
       const lines=['# '+projectName+' Snapshot v'+version+' - '+baseTimestamp.toLocaleString(),''];
       postItData.forEach((d,i)=>{
@@ -564,6 +525,7 @@
       version++;baseTimestamp=new Date();updateStats();
     };
 
+    // ========== PDF Export ==========
     exportPdfBtn.onclick=()=>{
       const dataUrl=canvas.toDataURL({format:'png',multiplier:2});
       const pdf=new jsPDF({unit:'pt',format:[canvas.width,canvas.height]});
@@ -571,7 +533,7 @@
       pdf.save('annotated_'+new Date().toISOString().slice(0,19).replace(/:/g,'')+'.pdf');
     };
 
-    // Undo = utoljára hozzáadott objektum törlése (nem teljes Undo stack)
+    // ========== Undo ==========
     undoBtn.onclick=()=>{
       const objs = canvas.getObjects();
       if(objs.length > 0){
@@ -587,7 +549,7 @@
       if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undoBtn.onclick(); }
     });
 
-    // --- CSAK FÁJLBA MENTÉS --- 
+    // ========== FÁJLBA MENTÉS / BETÖLTÉS ==========
     saveJsonBtn.onclick = function() {
       const now = new Date();
       const state = {
@@ -603,9 +565,8 @@
       a.download = `${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json`;
       document.body.appendChild(a);
       a.click();
-      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)}, 1000);
+      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)}, 900);
     };
-    // --- JSON-ból visszatöltés ---
     importJsonBtn.onclick = function() {
       importJsonFile.value = '';
       importJsonFile.click();
@@ -634,7 +595,8 @@
       };
       reader.readAsText(f);
     };
-    // --- ÚJ PROJEKT ---
+
+    // ========== ÚJ PROJEKT ==========
     newProjectBtn.onclick = function() {
       const pname = prompt("Új projekt neve:", "NÉVTELEN PROJEKT");
       if(pname===null) return;
@@ -647,7 +609,8 @@
       baseTimestamp = new Date();
       updateStats();
     };
-    // Új post-it létrehozásakor legyen interaktív!
+
+    // ========== POST-IT interaktivitás beállítása ==========
     canvas.on('object:added', function(opt){
       if(opt && opt.target && opt.target.type==='group') makeGroupInteractive(opt.target);
     });
@@ -656,6 +619,24 @@
     document.getElementById('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
+
+    // Always keep canvas fully filling container (resize handler)
+    function fitCanvasToContainer() {
+      const c=document.getElementById('canvas-container');
+      if(canvas.backgroundImage) {
+        const img = canvas.backgroundImage;
+        const scale=Math.min(c.clientWidth/img.width, c.clientHeight/img.height);
+        canvas.setWidth(img.width*scale);
+        canvas.setHeight(img.height*scale);
+        img.scale(scale);
+        canvas.renderAll();
+      } else {
+        canvas.setWidth(c.clientWidth);
+        canvas.setHeight(c.clientHeight);
+        canvas.renderAll();
+      }
+    }
+    window.addEventListener('resize', fitCanvasToContainer);
   </script>
 </body>
 </html>
