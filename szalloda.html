@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>PDF Rajzoló és Post-it Alkalmazás</title>
+  <title>SAV_PDF Rajzoló és Post-it Alkalmazás</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body, html { margin:0; padding:0; height:100%; overflow:hidden; font-family:sans-serif; }
@@ -23,12 +23,12 @@
     #modal input, #modal textarea, #modal select { width:100%; box-sizing:border-box; }
     #modal textarea { resize:vertical; }
     #modal .buttons { margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
-    #save-load-modal, #verzio-modal {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    #verzio-modal {position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
       background:#fff;padding:16px 20px;z-index:410;border-radius:8px;display:none;box-shadow:0 2px 10px rgba(0,0,0,0.3);}
-    #save-load-modal h3, #verzio-modal h3 {margin:0 0 8px;}
-    #save-load-modal ul, #verzio-modal ul {padding:0 0 8px 0;max-height:160px;overflow:auto;}
-    #save-load-modal ul li, #verzio-modal ul li {margin:0 0 4px 0;}
-    #save-load-modal button, #verzio-modal button{margin-right:8px;}
+    #verzio-modal h3 {margin:0 0 8px;}
+    #verzio-modal ul {padding:0 0 8px 0;max-height:160px;overflow:auto;}
+    #verzio-modal ul li {margin:0 0 4px 0;}
+    #verzio-modal button{margin-right:8px;}
     #project-name-edit {font-weight:bold; border:none; background:transparent; outline:none; font-size:1em;}
     #project-name-edit:hover, #project-name-edit:focus { background: #eee; }
   </style>
@@ -105,7 +105,6 @@
       </div>
     </form>
   </div>
-  <!-- Verzió visszatöltő popup -->
   <div id="verzio-modal">
     <h3>Mentett verziók</h3>
     <ul id="verzio-list"></ul>
@@ -150,12 +149,78 @@
     const verzioCloseBtn=document.getElementById('verzio-close-btn');
     const projectNameEdit=document.getElementById('project-name-edit');
 
+    // --------- 1. Új MENTÉS funkció (méretellenőrzéssel) -----------
+    function saveProjectState(isAuto = false) {
+      try {
+        const now = new Date();
+        const key = isAuto ? 'pdfrajz_autosave' : 'pdfrajz_verzio_' + now.toISOString().replace(/:/g, '-');
+        const canvasData = canvas.toDatalessJSON(['data']);
+        const state = {
+          name: projectName,
+          date: now.toLocaleString(),
+          canvas: canvasData
+        };
+        const stateStr = JSON.stringify(state);
+        const byteLength = new Blob([stateStr]).size;
+
+        if (byteLength < 4 * 1024 * 1024) { // 4MB localStorage korlát
+          localStorage.setItem(key, stateStr);
+          if (!isAuto) alert('Mentés sikeres: ' + projectName + " - " + state.date);
+        } else {
+          if (!isAuto) {
+            const blob = new Blob([stateStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('Az adat túl nagy volt, JSON fájlba mentettük.');
+          } else {
+            console.warn("Auto-mentés túl nagy, kihagyva.");
+          }
+        }
+        // projectName frissítés tárolása mindig
+        localStorage.setItem('pdfrajz_projectname', projectName);
+      } catch (e) {
+        console.error("Mentési hiba:", e);
+        if (!isAuto) alert('Mentési hiba történt: ' + e.message);
+      }
+    }
+    // --------- 2. Újratöltés biztonságosan -----------
+    function loadAutosave() {
+      const state = localStorage.getItem('pdfrajz_autosave');
+      if (!state) return;
+      try {
+        const data = JSON.parse(state);
+        projectName = data.name || "Névtelen projekt";
+        projectNameEdit.value = projectName;
+        canvas.loadFromJSON(data.canvas, function () {
+          canvas.renderAll();
+          canvas.getObjects('group').forEach(makeGroupInteractive);
+          postItData = canvas.getObjects('group').map(g => g.data);
+          updateStats();
+        });
+      } catch (e) {
+        console.warn("Hibás automatikus mentés betöltés közben:", e);
+      }
+    }
+    // --------- 3. Új hozzárendelések -----------
+    canvas.on('object:added', () => saveProjectState(true));
+    canvas.on('object:removed', () => saveProjectState(true));
+    canvas.on('object:modified', () => saveProjectState(true));
+    saveVersionBtn.onclick = () => saveProjectState(false);
+    window.addEventListener('DOMContentLoaded', loadAutosave);
+
+    // -------------- Eddigi logika, csak autosave/mentés helyett új függvényeket használunk --------------
+
     // Projekt név (helyreállítás UI-ra)
     projectNameEdit.value = projectName;
     projectNameEdit.onchange = function(){
       projectName = projectNameEdit.value.trim() || "Névtelen projekt";
       localStorage.setItem('pdfrajz_projectname', projectName);
       updateStats();
+      saveProjectState(true);
     };
 
     function setActiveButton(btn) {
@@ -440,7 +505,6 @@
 
     // Undo = utoljára hozzáadott objektum törlése (nem teljes Undo stack)
     undoBtn.onclick=()=>{
-      // ne töröld a hátteret!
       const objs = canvas.getObjects();
       if(objs.length > 0){
         let last = objs[objs.length-1];
@@ -456,18 +520,7 @@
       if(e.ctrlKey && e.key==='z'){ e.preventDefault(); undoBtn.onclick(); }
     });
 
-    // --- VERZIÓMENTÉS ---
-    saveVersionBtn.onclick = function() {
-      const now = new Date();
-      const key = 'pdfrajz_verzio_' + now.toISOString().replace(/:/g,'-');
-      const meta = {
-        name: projectName,
-        date: now.toLocaleString(),
-        canvas: canvas.toDatalessJSON(['data'])
-      };
-      localStorage.setItem(key, JSON.stringify(meta));
-      alert('Verzió mentve: ' + projectName + " - " + meta.date);
-    };
+    // --- VERZIÓLISTA popup ---
     loadVersionBtn.onclick = function() {
       verzioList.innerHTML = '';
       const keys = Object.keys(localStorage).filter(k=>k.startsWith('pdfrajz_verzio_')).sort().reverse();
@@ -494,6 +547,7 @@
             canvas.getObjects('group').forEach(makeGroupInteractive);
             postItData = canvas.getObjects('group').map(g=>g.data);
             updateStats();
+            saveProjectState(true);
           });
           verzioModal.style.display = 'none';
         }
@@ -516,47 +570,9 @@
       version = 1;
       baseTimestamp = new Date();
       updateStats();
-      // töröld az autosave-t is:
       localStorage.removeItem('pdfrajz_autosave');
+      saveProjectState(true);
     };
-
-    // --- AUTOMATIKUS MENTÉS minden módosításnál ---
-    function autoSave() {
-      try {
-        const state = JSON.stringify({
-          name: projectName,
-          canvas: canvas.toDatalessJSON(['data']),
-          timestamp: new Date().toLocaleString()
-        });
-        localStorage.setItem('pdfrajz_autosave', state);
-        localStorage.setItem('pdfrajz_projectname', projectName);
-      } catch (e) {
-        console.warn("Auto-save error:", e);
-      }
-    }
-    canvas.on('object:added', autoSave);
-    canvas.on('object:removed', autoSave);
-    canvas.on('object:modified', autoSave);
-
-    // --- AUTOMATIKUS VISSZATÖLTÉS oldalinduláskor ---
-    window.addEventListener('DOMContentLoaded', function() {
-      const state = localStorage.getItem('pdfrajz_autosave');
-      if(state) {
-        try {
-          const data = JSON.parse(state);
-          projectName = data.name || "Névtelen projekt";
-          projectNameEdit.value = projectName;
-          canvas.loadFromJSON(data.canvas, function() {
-            canvas.renderAll();
-            canvas.getObjects('group').forEach(makeGroupInteractive);
-            postItData = canvas.getObjects('group').map(g=>g.data);
-            updateStats();
-          });
-        } catch (e) {
-          console.warn("Auto-load error:", e);
-        }
-      }
-    });
 
     // Új post-it létrehozásakor legyen interaktív!
     canvas.on('object:added', function(opt){
@@ -571,10 +587,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
