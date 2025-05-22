@@ -2,162 +2,220 @@
 <html lang="hu">
 <head>
   <meta charset="utf-8">
-  <title>2Lean Obeya Rajzoló, Post-it, A3 sablon</title>
+  <title>Lean Obeya Rajzoló, Post-it, A3 sablon</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Tailwind CDN (csak devhez, prod-ra build-eld) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Külső JS könyvtárak -->
+  <!-- Külső könyvtárak -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
-    /* Canvas extra stílusok - mivel Tailwind nem stylolja a fabricjs elemeket */
-    canvas { border-radius: 0.5rem; border: 2px solid #c3dafe; background: #fafdff; display: block; }
-    .dragging-shadow { box-shadow: 0 7px 20px 0 rgba(120,120,80,0.19) !important; }
+    :root {
+      --sidebar-width: 180px;
+      --toolbar-height: 56px;
+      --canvas-bg: #fafdff;
+    }
+    html, body { height:100%; margin:0; padding:0; font-family:sans-serif; background:#f7fafd; }
+    body { height:100vh; overflow:hidden;}
+    #toolbar {
+      position:fixed; left:0; top:0; right:var(--sidebar-width); height:var(--toolbar-height);
+      background:#f4f4f4; z-index:3; display:flex; align-items:center; gap:8px; padding:10px 8px 10px 12px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.09);
+      overflow-x:auto;
+    }
+    #toolbar button, #toolbar input[type="color"], #toolbar input[type="number"], #toolbar select {
+      padding:7px 13px; border:none; border-radius:5px; background:#fff; cursor:pointer;
+      transition:background 0.13s,box-shadow 0.13s; font-size:1em; outline:none; box-shadow: 0 1px 3px rgba(0,0,0,0.04);}
+    #toolbar button.active, #toolbar button:focus, #toolbar button:hover {
+      background:#2196f3; color:#fff; box-shadow: 0 1px 4px rgba(33,150,243,0.08);}
+    #toolbar input[type="color"] { padding:2px 4px; width:2em; height:2em;}
+    #project-name-wrap { display:inline-flex;align-items:center; gap:6px; background:#e3eaf7; border-radius:4px;
+      padding:3px 8px 3px 6px; margin-left:12px; margin-right:2px;}
+    #project-name-edit {
+      font-weight: bold; border: none; background: transparent; outline: none; font-size:1em;
+      border-bottom:2px solid #b2cdf9; padding:1px 4px 1px 2px; text-transform:uppercase;
+      min-width:110px; max-width:180px;}
+    #project-pencil { font-size:1em; cursor:pointer; color:#888; margin-left:2px; transition:color 0.15s;}
+    #project-pencil:hover { color:#2196f3;}
+    #stats-panel {
+      position:fixed; right:var(--sidebar-width); top:0; width:200px; bottom:0;
+      background:#fff; border-left:1px solid #e1e1e1; padding:13px 8px 8px 16px; font-size:13px; overflow-y:auto; z-index:2;
+      box-shadow: -1px 0 9px rgba(0,0,0,0.03);}
+    #canvas-container {
+      position:absolute; top:var(--toolbar-height); left:0; right:calc(var(--sidebar-width) + 200px); bottom:0;
+      background: var(--canvas-bg); overflow:hidden; z-index:1;
+    }
+    canvas { display:block; position:absolute; top:0; left:0; border:1.5px solid #d3e0ef; border-radius:6px; }
+    #sidebar {
+      position:fixed; right:0; top:0; width:var(--sidebar-width); bottom:0; background:#f4f8ff; z-index:5;
+      box-shadow: -2px 0 11px rgba(100,150,200,0.07);
+      display:flex; flex-direction:column; align-items:center; padding:13px 5px 7px 5px;
+      overflow-y:auto;
+    }
+    .sidebar-title { font-size:1em; font-weight:700; color:#257be6; margin-bottom:11px;}
+    #add-postit-btn {
+      margin:10px 0 16px 0; width:90%; padding:7px 0; font-size:1.1em; border-radius:6px;
+      background:linear-gradient(90deg,#ffe66d 60%,#f3c700 100%); border:none; color:#222; font-weight:600; cursor:pointer;
+      box-shadow:0 1px 5px rgba(210, 210, 70,0.08);}
+    #add-postit-btn:hover { background:linear-gradient(90deg,#ffd000 30%,#ffee92 100%);}
+    .postit-sample {
+      width:130px; height:110px; margin-bottom:17px; border-radius:11px; box-shadow:2px 3px 16px rgba(0,0,0,0.13);
+      display:flex; align-items:center; justify-content:center; font-size:1.5em; font-weight:bold;
+      cursor:grab; position:relative; transition:transform 0.18s;
+      border:2.5px solid #c2b476; user-select:none;
+      background:#fffbe6;
+    }
+    .postit-sample.dragging { transform:rotate(-3deg) scale(1.06) skew(-1deg,1deg) translateY(-7px); box-shadow:4px 7px 18px rgba(40,70,80,0.12);}
+    .postit-label {
+      position:absolute; bottom:6px; right:8px; font-size:.85em; font-weight:400; color:#86701b; pointer-events:none;}
+    .postit-on-canvas {
+      position:absolute; z-index:11; pointer-events:none; display:none;
+      filter:drop-shadow(2px 7px 11px #aaa7);
+    }
+    .canvas-postit-a3btn {
+      position:absolute; top:-9px; right:-9px; z-index:12; width:27px; height:27px; background:#e6f6fd;
+      border-radius:99px; border:1.7px solid #49b2e0; box-shadow:0 1.7px 8px #bbb5;
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+      font-size:1.25em; color:#1894d3; font-weight:bold; transition:background 0.12s;}
+    .canvas-postit-a3btn:hover { background:#c7ebfb;}
+    #modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); display:none; z-index:1001;}
+    #modal, #a3-modal {
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      background:#fff; border-radius:13px; min-width:340px; max-width:98vw;
+      padding:0 0 16px 0; box-shadow:0 3px 33px rgba(0,0,0,0.17);
+      z-index:1011; display:none; border-top:7px solid var(--modal-header, #ffd600);
+      overflow:hidden;
+    }
+    #modal h3, #a3-modal h3 { margin:0; padding:18px 0 12px 23px; font-size:1.22em; font-weight:bold; letter-spacing:.5px;
+      background:linear-gradient(90deg,var(--modal-header, #ffd600)10%,#f7f7d8 120%); border-radius:0 0 10px 0;
+      color:#282c34; border-bottom:1px solid #eaeaea;}
+    #modal label, #a3-modal label { display:block; margin:10px 0 4px 24px; font-size:.99em; }
+    #modal input, #modal textarea, #a3-modal input, #a3-modal textarea {
+      width:88%; margin-left:24px; margin-bottom:8px; box-sizing:border-box; font-size:1em;
+      border:1px solid #c6d2ea; border-radius:6px; padding:8px 9px; background:#fbfcff; resize:none; transition:border 0.15s;}
+    #modal textarea, #a3-modal textarea { resize:vertical;}
+    #modal .buttons, #a3-modal .buttons { margin-top:14px; margin-right:18px; display:flex; justify-content:flex-end; gap:8px;}
+    #modal button, #a3-modal button { background:#2196f3; color:#fff; border:none; border-radius:4px; padding:8px 15px; font-size:1em; font-weight:500; box-shadow:0 1px 4px rgba(33,150,243,0.09); transition:background 0.13s; cursor:pointer;}
+    #modal button:hover, #a3-modal button:hover { background: #1769aa;}
+    #a3-modal { max-width:700px;}
+    .a3-fields { display:grid; grid-template-columns: 1fr 1fr; gap:14px 23px; padding:17px 25px 7px 25px;}
+    .a3-fields label { margin:0 0 4px 0;}
+    .a3-fields input, .a3-fields textarea { margin-left:0; }
+    .a3-actions { grid-column:1/3; }
+    .a3-title { text-align:center; font-size:1.15em; font-weight:700; color:#116bb0; margin-bottom:12px;}
+    .a3-section { padding:9px 0 7px 0;}
+    .a3-section-title { font-weight:600; color:#344c62; font-size:1.08em; margin-bottom:4px;}
+    @media (max-width:900px){
+      #canvas-container {right:var(--sidebar-width);}
+      #stats-panel {display:none;}
+      #sidebar { width:95px;}
+      .postit-sample { width:70px; height:63px; font-size:.96em;}
+      .sidebar-title, #add-postit-btn {display:none;}
+    }
+    @media (max-width:600px){
+      #toolbar { font-size:.92em;}
+      #canvas-container {left:0; right:var(--sidebar-width);}
+    }
   </style>
 </head>
-<body class="bg-blue-50 h-screen w-screen overflow-hidden">
-
+<body>
   <!-- TOOLBAR -->
-  <div id="toolbar" class="fixed left-0 top-0 right-48 h-16 bg-gray-100 z-30 flex items-center gap-2 px-3 py-2 shadow-md overflow-x-auto">
-    <input type="file" id="file-input" accept="application/pdf" title="PDF háttér betöltése"
-      class="w-36 text-xs file:mr-2 file:rounded file:border-0 file:bg-blue-100 file:py-2 file:px-4 file:text-blue-900 file:font-semibold">
-    <button id="draw-btn" title="Szabadkézi rajz"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">✏️</button>
-    <button id="line-btn" title="Vonal"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">/</button>
-    <button id="rect-btn" title="Téglalap"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">▭</button>
-    <button id="select-btn" title="Kijelölés/mozgatás"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">🔲</button>
-    <button id="undo-btn" title="Visszavonás"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">⤺</button>
-    <span id="project-name-wrap"
-      class="inline-flex items-center gap-2 bg-blue-100 rounded px-2 py-1 ml-4">
-      <input id="project-name-edit" title="Projekt neve szerkeszthető" value="NÉVTELEN PROJEKT"
-        class="font-bold border-none bg-transparent outline-none text-base border-b-2 border-blue-200 px-1 py-0.5 uppercase w-32 max-w-xs">
-      <span id="project-pencil" title="Szerkesztés" class="text-gray-500 cursor-pointer hover:text-blue-700 transition">🖉</span>
+  <div id="toolbar">
+    <input type="file" id="file-input" accept="application/pdf" title="PDF háttér betöltése">
+    <button id="draw-btn" title="Szabadkézi rajz">✏️</button>
+    <button id="line-btn" title="Vonal">/</button>
+    <button id="rect-btn" title="Téglalap">▭</button>
+    <button id="select-btn" title="Kijelölés/mozgatás">🔲</button>
+    <button id="undo-btn" title="Visszavonás">⤺</button>
+    <span id="project-name-wrap">
+      <input id="project-name-edit" title="Projekt neve szerkeszthető" value="NÉVTELEN PROJEKT">
+      <span id="project-pencil" title="Szerkesztés">🖉</span>
     </span>
-    <button id="save-json-btn" title="Mentés JSON-ba"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">💾</button>
-    <button id="import-json-btn" title="JSON visszatöltés"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">📁</button>
+    <button id="save-json-btn" title="Mentés JSON-ba">💾</button>
+    <button id="import-json-btn" title="JSON visszatöltés">📁</button>
     <input type="file" id="import-json-file" accept="application/json" style="display:none">
-    <button id="new-project-btn" title="Új projekt"
-      class="rounded px-3 py-2 bg-red-100 text-red-600 font-bold hover:bg-red-500 hover:text-white transition">🆕</button>
-    <label class="flex items-center gap-1 ml-4">Szín:
-      <input type="color" id="color-picker" value="#ff0000" class="w-8 h-8 rounded border border-gray-200">
-    </label>
-    <label class="flex items-center gap-1">Vastagság:
-      <input type="number" id="stroke-width" value="2" min="1" max="20" class="w-14 ml-1 px-1 py-0.5 rounded border border-gray-200">
-    </label>
-    <button id="text-btn" title="Felirat"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">🔤</button>
-    <button id="export-pdf-btn" title="Mentés PDF-be"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">🖨️</button>
-    <button id="export-summary-btn" title="Export Jegyzőkönyv"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">📜</button>
-    <button id="export-xlsx-btn" title="Feladatlista Excel"
-      class="rounded px-3 py-2 bg-white hover:bg-blue-500 hover:text-white transition">🧾</button>
+    <button id="new-project-btn" style="color:#a00" title="Új projekt">🆕</button>
+    <label>Szín:<input type="color" id="color-picker" value="#ff0000"></label>
+    <label>Vastagság:<input type="number" id="stroke-width" value="2" min="1" max="20"></label>
+    <button id="text-btn" title="Felirat">🔤</button>
+    <button id="export-pdf-btn" title="Mentés PDF-be">🖨️</button>
+    <button id="export-summary-btn" title="Export Jegyzőkönyv">📜</button>
+    <button id="export-xlsx-btn" title="Feladatlista Excel">🧾</button>
   </div>
-
   <!-- STATS PANEL -->
-  <div id="stats-panel" class="fixed right-48 top-0 w-48 bottom-0 bg-white border-l border-gray-200 px-4 py-3 font-light text-sm overflow-y-auto z-20 shadow">
-    <h4 class="font-bold text-blue-700 mb-2">Pillanatkép</h4>
-    <div id="snapshot-info" class="mb-2"></div><hr class="my-2">
+  <div id="stats-panel">
+    <h4>Pillanatkép</h4>
+    <div id="snapshot-info"></div><hr>
     <div><strong>Post-it-ek:</strong> <span id="stat-count">0</span></div>
-    <div><strong>Felelősök:</strong></div>
-    <ul id="stat-by-responsible" class="list-disc pl-4 text-xs"></ul>
+    <div><strong>Felelősök:</strong></div><ul id="stat-by-responsible"></ul>
   </div>
-
   <!-- CANVAS -->
-  <div id="canvas-container" class="absolute top-16 left-0 right-48 bottom-0 bg-blue-50 overflow-hidden">
-    <canvas id="c"></canvas>
-  </div>
-
+  <div id="canvas-container"><canvas id="c"></canvas></div>
   <!-- SIDEBAR: POST-IT MINTÁK -->
-  <div id="sidebar" class="fixed right-0 top-0 w-48 h-full bg-blue-50 z-50 flex flex-col items-center px-2 py-5 shadow-lg gap-2">
-    <div class="sidebar-title font-semibold text-blue-600 mb-3">Post-it sablonok</div>
-    <button id="add-postit-btn"
-      class="w-11/12 py-2 mb-2 rounded bg-yellow-200 hover:bg-yellow-400 font-bold text-yellow-900 shadow transition">+ Új post-it minta</button>
-    <div id="postit-samples" class="flex flex-col items-center gap-4"></div>
+  <div id="sidebar">
+    <div class="sidebar-title">Post-it sablonok</div>
+    <button id="add-postit-btn">+ Új post-it minta</button>
+    <div id="postit-samples"></div>
   </div>
-
   <!-- MODAL: POSTIT FORM -->
-  <div id="modal-overlay" class="fixed inset-0 bg-black/40 hidden z-[1001]"></div>
-  <div id="modal" class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl min-w-[340px] max-w-[95vw] p-0 pb-4 shadow-2xl border-t-8 border-yellow-400 z-[1011] hidden">
-    <h3 id="modal-header" class="text-lg font-bold py-4 px-6 border-b bg-gradient-to-r from-yellow-300 to-yellow-100 rounded-t-xl">Post-it adatok</h3>
-    <form id="postit-form" autocomplete="off" class="px-6 pt-2 flex flex-col gap-1">
-      <label class="mt-2 font-semibold">Fejléc:
-        <input type="text" id="header-input" required class="block w-full p-2 border rounded mt-1 text-base bg-yellow-50" style="text-transform:uppercase">
-      </label>
-      <label class="font-semibold">Papír szín:
-        <input type="color" id="color-input" value="#ffeb3b" required class="ml-2 w-9 h-9 rounded border border-gray-300">
-      </label>
-      <label class="font-semibold">Akadály leírása:
-        <textarea id="akadaly-input" rows="2" required class="block w-full p-2 border rounded mt-1 bg-blue-50"></textarea>
-      </label>
-      <label class="font-semibold">Közreműködő:
-        <input type="text" id="kozig-input" required class="block w-full p-2 border rounded mt-1 bg-blue-50">
-      </label>
-      <label class="font-semibold">Határidő:
-        <input type="date" id="hatarido-input" required class="block w-full p-2 border rounded mt-1 bg-blue-50">
-      </label>
-      <label class="font-semibold">Helyiségcsoport:
-        <input type="text" id="helyisegcsoport-input" class="block w-full p-2 border rounded mt-1 bg-blue-50">
-      </label>
-      <label class="font-semibold">Megjegyzés:
-        <textarea id="megj-input" rows="2" class="block w-full p-2 border rounded mt-1 bg-blue-50"></textarea>
-      </label>
-      <div class="buttons flex justify-end gap-3 mt-4">
-        <button type="button" id="cancel-btn" class="px-5 py-2 rounded bg-gray-100 text-gray-700 font-semibold hover:bg-gray-300">Mégsem</button>
-        <button type="submit" class="px-5 py-2 rounded bg-blue-500 text-white font-bold hover:bg-blue-700">Mentés</button>
+  <div id="modal-overlay"></div>
+  <div id="modal">
+    <h3 id="modal-header">Post-it adatok</h3>
+    <form id="postit-form" autocomplete="off">
+      <label>Fejléc:<input type="text" id="header-input" required style="text-transform:uppercase"></label>
+      <label>Papír szín:<input type="color" id="color-input" value="#ffeb3b" required></label>
+      <label>Akadály leírása:<textarea id="akadaly-input" rows="2" required></textarea></label>
+      <label>Közreműködő:<input type="text" id="kozig-input" required></label>
+      <label>Határidő:<input type="date" id="hatarido-input" required></label>
+      <label>Helyiségcsoport:<input type="text" id="helyisegcsoport-input"></label>
+      <label>Megjegyzés:<textarea id="megj-input" rows="2"></textarea></label>
+      <div class="buttons">
+        <button type="button" id="cancel-btn">Mégsem</button>
+        <button type="submit">Mentés</button>
       </div>
     </form>
   </div>
-
   <!-- MODAL: A3 SABLON -->
-  <div id="a3-modal" class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl max-w-2xl w-full shadow-2xl border-t-8 border-blue-300 z-[1011] hidden">
-    <h3 class="text-lg font-bold py-4 px-6 border-b bg-gradient-to-r from-blue-300 to-blue-100 rounded-t-xl">A3 jelentés (PDCA)</h3>
-    <form id="a3-form" autocomplete="off" class="px-6 py-2 flex flex-col gap-1">
-      <div class="a3-title text-center text-blue-700 font-bold text-lg mb-2"><span id="a3-header"></span></div>
-      <div class="grid grid-cols-2 gap-x-6 gap-y-2">
-        <div>
-          <div class="font-semibold">Probléma</div>
-          <textarea id="a3-problem" rows="2" required class="block w-full p-2 border rounded bg-blue-50"></textarea>
+  <div id="a3-modal">
+    <h3>A3 jelentés (PDCA)</h3>
+    <form id="a3-form" autocomplete="off">
+      <div class="a3-title"><span id="a3-header"></span></div>
+      <div class="a3-fields">
+        <div class="a3-section">
+          <div class="a3-section-title">Probléma</div>
+          <textarea id="a3-problem" rows="2" required></textarea>
         </div>
-        <div>
-          <div class="font-semibold">Cél</div>
-          <textarea id="a3-goal" rows="2" required class="block w-full p-2 border rounded bg-blue-50"></textarea>
+        <div class="a3-section">
+          <div class="a3-section-title">Cél</div>
+          <textarea id="a3-goal" rows="2" required></textarea>
         </div>
-        <div>
-          <div class="font-semibold">Gyökérok</div>
-          <textarea id="a3-rootcause" rows="2" class="block w-full p-2 border rounded bg-blue-50"></textarea>
+        <div class="a3-section">
+          <div class="a3-section-title">Gyökérok</div>
+          <textarea id="a3-rootcause" rows="2"></textarea>
         </div>
-        <div>
-          <div class="font-semibold">Javaslat</div>
-          <textarea id="a3-countermeasure" rows="2" class="block w-full p-2 border rounded bg-blue-50"></textarea>
+        <div class="a3-section">
+          <div class="a3-section-title">Javaslat</div>
+          <textarea id="a3-countermeasure" rows="2"></textarea>
         </div>
-        <div class="col-span-2">
-          <div class="font-semibold">Akciók / Felelősök / Határidők</div>
-          <textarea id="a3-actions" rows="2" class="block w-full p-2 border rounded bg-blue-50"></textarea>
+        <div class="a3-section a3-actions">
+          <div class="a3-section-title">Akciók / Felelősök / Határidők</div>
+          <textarea id="a3-actions" rows="2"></textarea>
         </div>
-        <div>
-          <div class="font-semibold">Felelős</div>
-          <input type="text" id="a3-owner" class="block w-full p-2 border rounded bg-blue-50">
+        <div class="a3-section">
+          <div class="a3-section-title">Felelős</div>
+          <input type="text" id="a3-owner">
         </div>
-        <div>
-          <div class="font-semibold">Eredmény / Megjegyzés</div>
-          <textarea id="a3-result" rows="2" class="block w-full p-2 border rounded bg-blue-50"></textarea>
+        <div class="a3-section">
+          <div class="a3-section-title">Eredmény / Megjegyzés</div>
+          <textarea id="a3-result" rows="2"></textarea>
         </div>
       </div>
-      <div class="flex justify-end gap-3 mt-4">
-        <button type="button" id="a3-cancel-btn" class="px-5 py-2 rounded bg-gray-100 text-gray-700 font-semibold hover:bg-gray-300">Mégsem</button>
-        <button type="submit" class="px-5 py-2 rounded bg-blue-500 text-white font-bold hover:bg-blue-700">Mentés</button>
-        <button type="button" id="a3-export-btn" title="Export A3 jelentés PDF-be"
-          class="px-5 py-2 rounded bg-green-400 text-white font-bold hover:bg-green-600">PDF</button>
+      <div class="buttons">
+        <button type="button" id="a3-cancel-btn">Mégsem</button>
+        <button type="submit">Mentés</button>
+        <button type="button" id="a3-export-btn" title="Export A3 jelentés PDF-be">PDF</button>
       </div>
     </form>
   </div>
@@ -224,7 +282,7 @@
         d.setAttribute("draggable", "true");
         d.style.background = p.color;
         d.dataset.color = p.color;
-        d.title = `Post-it minta (${p.color})`;
+        d.title = Post-it minta (${p.color});
 
         // Drag events
         d.addEventListener('dragstart', ev => {
@@ -311,7 +369,7 @@
         left:0,top:0,width:195,height:110,fill:color,stroke:'#b7ad75',strokeWidth:2,rx:10,ry:10
       });
       const head=new fabric.Textbox(header,{left:13,top:10,fontSize:14,fontWeight:'bold',fill:'#24210b',width:rectPt.width-20, splitByGrapheme:true});
-      const bodyText=[`1. Leírás: ${akad}`,`2. Közreműködő: ${kozg}`,`3. Határidő: ${hat}`,`4. Helyiségcsoport: ${hely}`,`5. Megjegyzés: ${meg}`].join('\n');
+      const bodyText=[1. Leírás: ${akad},2. Közreműködő: ${kozg},3. Határidő: ${hat},4. Helyiségcsoport: ${hely},5. Megjegyzés: ${meg}].join('\n');
       const body=new fabric.Textbox(bodyText,{left:13,top:38,width:rectPt.width-25,fontSize:11,fill:'#1a1a1a', splitByGrapheme:true});
       // --- A3+ ikon (csak CANVAS-on) ---
       const a3BtnImg = document.createElement('div');
@@ -374,11 +432,11 @@
         group.item(0).set('fill', color);
         group.item(1).set('text', header);
         group.item(2).set('text', [
-          `1. Leírás: ${akad}`,
-          `2. Közreműködő: ${kozg}`,
-          `3. Határidő: ${hat}`,
-          `4. Helyiségcsoport: ${hely}`,
-          `5. Megjegyzés: ${meg}`
+          1. Leírás: ${akad},
+          2. Közreműködő: ${kozg},
+          3. Határidő: ${hat},
+          4. Helyiségcsoport: ${hely},
+          5. Megjegyzés: ${meg}
         ].join('\n'));
         group.setCoords();
         canvas.requestRenderAll();
@@ -439,7 +497,7 @@
       $('a3-goal').value = "";
       $('a3-rootcause').value = "";
       $('a3-countermeasure').value = "";
-      $('a3-actions').value = `Felelős: ${group.data.kozig||""}  Határidő: ${group.data.hatarido||""}`;
+      $('a3-actions').value = Felelős: ${group.data.kozig||""}  Határidő: ${group.data.hatarido||""};
       $('a3-owner').value = group.data.kozig||"";
       $('a3-result').value = "";
       overlay.style.display=a3modal.style.display='block';
@@ -636,7 +694,7 @@
       ]));
       const ws = XLSX.utils.aoa_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, "Feladatlista");
-      XLSX.writeFile(wb, `Feladatlista_${projectName.replace(/[\s.]/g,'_')}.xlsx`);
+      XLSX.writeFile(wb, Feladatlista_${projectName.replace(/[\s.]/g,'_')}.xlsx);
     };
     exportPdfBtn.onclick=()=>{
       const dataUrl=canvas.toDataURL({format:'png',multiplier:2});
@@ -672,7 +730,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json`;
+      a.download = ${projectName.replace(/\s+/g, '_')}_backup_${now.toISOString().slice(0, 19).replace(/:/g, '')}.json;
       document.body.appendChild(a);
       a.click();
       setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)}, 900);
@@ -742,7 +800,7 @@
       ul.innerHTML='';
       Object.entries(by).forEach(([r,c])=>{
         const li=document.createElement('li');
-        li.textContent=`${r}: ${c}`;
+        li.textContent=${r}: ${c};
         ul.appendChild(li);
       });
     }
