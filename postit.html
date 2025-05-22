@@ -697,6 +697,42 @@
     $('c').addEventListener('contextmenu',function(e){
       if(mode==='pan') e.preventDefault();
     });
+
+    let isSpacePan = false;
+document.addEventListener('keydown', function(e){
+  if(e.code === 'Space') isSpacePan = true;
+});
+document.addEventListener('keyup', function(e){
+  if(e.code === 'Space') isSpacePan = false;
+});
+
+let isCanvasPanning = false, panStart = {x:0, y:0}, panViewportStart = {x:0, y:0};
+canvas.on('mouse:down', function(opt){
+  const e = opt.e;
+  // Space+bal egérgomb
+  if (isSpacePan && e.button === 0) {
+    isCanvasPanning = true;
+    panStart = {x: e.clientX, y: e.clientY};
+    panViewportStart = {x: canvas.viewportTransform[4], y: canvas.viewportTransform[5]};
+    canvas.defaultCursor = 'grabbing';
+  }
+});
+canvas.on('mouse:move', function(opt){
+  const e = opt.e;
+  if(isCanvasPanning) {
+    const v = canvas.viewportTransform;
+    v[4] = panViewportStart.x + (e.clientX - panStart.x);
+    v[5] = panViewportStart.y + (e.clientY - panStart.y);
+    canvas.setViewportTransform(v);
+  }
+});
+canvas.on('mouse:up', function(opt){
+  if(isCanvasPanning) {
+    isCanvasPanning = false;
+    canvas.defaultCursor = 'default';
+  }
+});
+
   </script>
 </body>
 </html>
