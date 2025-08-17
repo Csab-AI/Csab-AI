@@ -780,17 +780,14 @@
         function loadDefaultData() {
             if (projects.length === 0) {
                 projects = [
-                    { id: 1, name: "Lauda projekt 1. ütem", startDate: "2025-02-03", endDate: "2025-07-31", assignments: [] },
-                    { id: 2, name: "Auguszta projekt", startDate: "2025-02-03", endDate: "2025-03-31", assignments: [] },
-                    { id: 3, name: "Lyceum szálloda", startDate: "2025-02-03", endDate: "2025-09-15", assignments: [] },
-                    { id: 4, name: "NYIA Rising csarnok", startDate: "2025-02-03", endDate: "2025-09-30", assignments: [] },
-                    { id: 5, name: "LEGO kantin", startDate: "2025-02-15", endDate: "2025-10-30", assignments: [] },
-                    { id: 6, name: "Bánky felújítás", startDate: "2025-03-01", endDate: "2025-10-30", assignments: [] },
-                    { id: 7, name: "Kossuth utcai társasház", startDate: "2025-02-20", endDate: "2025-12-31", assignments: [] },
-                    { id: 8, name: "Sátoraljaújhely szálloda", startDate: "2025-02-03", endDate: "2025-10-30", assignments: [] },
-                    { id: 9, name: "Balatonakarattya", startDate: "2025-05-01", endDate: "2025-12-31", assignments: [] },
-                    { id: 10, name: "Szabad kapacitás", startDate: "2025-04-01", endDate: "2025-12-31", assignments: [] },
-                    { id: 11, name: "Szabad kapacitás 2", startDate: "2025-07-01", endDate: "2025-12-31", assignments: [] }
+                    { id: 1, name: "Lauda projekt 3. ütem (áthúzódó)", startDate: "2025-12-15", endDate: "2026-03-31", assignments: [] },
+                    { id: 6, name: "Bánky felújítás", startDate: "2025-03-01", endDate: "2026-06-30", assignments: [] },
+                    { id: 7, name: "Kossuth utcai társasház", startDate: "2025-08-10", endDate: "2026-08-31", assignments: [] },
+                    { id: 7, name: "Saját - kisebb társasház", startDate: "2026-05-01", endDate: "2026-12-31", assignments: [] },
+                    { id: 7, name: "Saját - nagyobb társasház", startDate: "2026-08-01", endDate: "2026-12-31", assignments: [] },
+                    { id: 10, name: "Szabad kapacitás 1", startDate: "2026-01-01", endDate: "2026-12-31", assignments: [] },
+                    { id: 11, name: "Szabad kapacitás 2", startDate: "2025-03-01", endDate: "2026-12-31", assignments: [] }
+                     { id: 11, name: "Szabad kapacitás 3", startDate: "2025-05-01", endDate: "2026-12-31", assignments: [] }
                 ];
             }
 
@@ -800,7 +797,6 @@
                     { id: 2, name: "Barta Miklós", role: "építésvezető" },
                     { id: 3, name: "Bencze Zoltán", role: "projektvezető főmérnök" },
                     { id: 4, name: "Bordás Csaba", role: "építésvezető" },
-                    { id: 5, name: "Czinke-Nagy Fanni", role: "előkészítő mérnök" },
                     { id: 6, name: "Deák Viktor", role: "projektvezető mérnök" },
                     { id: 7, name: "Dobi Róbert", role: "főépítésvezető" },
                     { id: 8, name: "Gerzsenyi László", role: "főépítésvezető" },
@@ -808,25 +804,26 @@
                     { id: 10, name: "Hidi Béla", role: "építésvezető" },
                     { id: 11, name: "Hrabovszki János Norbert", role: "projektvezető mérnök" },
                     { id: 12, name: "Hutóczki Kristóf", role: "épületgépész projektmérnök" },
-                    { id: 13, name: "Iglicz Zoltán", role: "munkahelyi technikus" },
                     { id: 14, name: "Kaszonyi Botond", role: "építésvezető" },
                     { id: 15, name: "Kiss Szabolcs Krisztián", role: "építésvezető" },
+                     { id: 15, name: "Uhrin László", role: "építésvezető" },
                     { id: 16, name: "Kulcsár Lajos", role: "szerelőipari főmérnök" },
                     { id: 17, name: "Kunkli Judit", role: "munkahelyi technikus" },
                     { id: 18, name: "Lacza János", role: "előkészítő mérnök" },
                     { id: 19, name: "Laposi Ferenc Ádám", role: "építésvezető" },
+                    { id: 19, name: "Szabó Márk", role: "építésvezető" },
+                    { id: 19, name: "Osán Ádám", role: "építésvezető" },
                     { id: 20, name: "Lisku Gergő", role: "munkahelyi technikus" },
-                    { id: 21, name: "Nánási Attila", role: "építésvezető" },
+                    { id: 20, name: "Erdős Ádám", role: "munkahelyi technikus" },
                     { id: 22, name: "Nemesné Gyöngyösi Katalin Györgyi", role: "előkészítő mérnök" },
                     { id: 23, name: "Oláh András", role: "épületvillamossági projektmérnök" },
                     { id: 24, name: "Pósán Miklós Zoltán", role: "épületvillamossági projektmérnök" },
                     { id: 25, name: "Sáfár Noémi Rozália", role: "előkészítő mérnök" },
-                    { id: 26, name: "Sági Ibolya", role: "előkészítő mérnök" },
                     { id: 27, name: "Sütő Károly", role: "projektvezető főmérnök" },
                     { id: 28, name: "Süvöltős Sándor József", role: "épületgépész projektmérnök" },
+                     { id: 28, name: "Máté Szabolcs", role: "épületgépész projektmérnök" },
                     { id: 29, name: "Szabó Ivett Petronella", role: "szerelőipari asszisztens" },
                     { id: 30, name: "Szarvas Sándor", role: "épületvillamossági projektmérnök" },
-                    { id: 31, name: "Varga Sándor", role: "munkahelyi technikus" },
                     { id: 32, name: "Vigh Tamás", role: "projektvezető főmérnök" }
                 ];
             }
@@ -1506,3 +1503,4 @@ function saveToPDF() {
     </script>
 </body>
 </html>
+
