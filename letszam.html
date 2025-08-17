@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hunep - Erőforrás Hozzárendelés</title>
+    <title>3Hunep - Erőforrás Hozzárendelés</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -1144,6 +1144,12 @@
             document.getElementById('percentageInput').value = '100';
         }
 
+        // GANTT modal bezárása
+        function closeGanttModal() {
+            const el = document.getElementById('ganttModal');
+            if (el) el.style.display = 'none';
+        }
+
         // Hozzárendelés megerősítése
         function confirmAssignment() {
             const percentage = parseInt(document.getElementById('percentageInput').value);
@@ -1367,6 +1373,11 @@
 
   // További: látható régió középre fókuszálása (opcionális)
   // scroll.scrollLeft = 0; // ha akarod, automatikusan görgethetsz ide
+    // Nyissa meg a GANTT modalt, ha létezik (a gomb ezt hívja)
+    const ganttModalEl = document.getElementById('ganttModal');
+    if (ganttModalEl) {
+        ganttModalEl.style.display = 'block';
+    }
 }
 
 // segédfüggvény (yyyy.mm.dd)
