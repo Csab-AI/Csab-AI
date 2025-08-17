@@ -830,8 +830,8 @@
                     { id: 29, name: "Szabó Ivett Petronella", role: "szerelőipari asszisztens" },
                     { id: 30, name: "Szabó Márk", role: "építésvezető" },
                     { id: 31, name: "Szarvas Sándor", role: "épületvillamossági projektmérnök" },
-                    { id: 32, name: "Vigh Tamás", role: "projektvezető főmérnök" }
-                    { id: 33, name: "Szombathy Szabolcs", role: "főépítésvezető" },
+                    { id: 32, name: "Vigh Tamás", role: "projektvezető főmérnök" },
+                    { id: 33, name: "Szombathy Szabolcs", role: "főépítésvezető" }
                 ];
             }
 
@@ -1323,8 +1323,23 @@
 
   inner.appendChild(header);
 
-  // sorok: minden projekthoz egy sor
-  projects.forEach((proj, idx) => {
+    // date parser helper (accepts Date, ISO, yyyy.mm.dd, yyyy-mm-dd)
+    function parseDateField(v) {
+        if (!v) return null;
+        if (v instanceof Date) return v;
+        const s = String(v).trim();
+        if (!s) return null;
+        // normalize dots to dashes, remove spaces
+        const norm = s.replace(/\./g, '-').replace(/\s+/g, '');
+        const d = new Date(norm);
+        if (!isNaN(d)) return d;
+        const m = s.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
+        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return null;
+    }
+
+    // sorok: minden projekthoz egy sor
+    projects.forEach((proj, idx) => {
     const row = document.createElement('div');
     row.className = 'gantt-row';
     row.style.width = labelLeftWidth + timelineWidth + 'px';
@@ -1338,11 +1353,15 @@
     content.className = 'gantt-row-content';
     content.style.width = timelineWidth + 'px';
 
-    // projekt dátumok: keresés input mezőkből, vagy a projekt objektumból
-    const startInput = document.getElementById(`start-date-${proj.id}`);
-    const endInput = document.getElementById(`end-date-${proj.id}`);
-    let pStart = startInput && startInput.value ? new Date(startInput.value) : (proj.start ? new Date(proj.start) : null);
-    let pEnd = endInput && endInput.value ? new Date(endInput.value) : (proj.end ? new Date(proj.end) : null);
+        // projekt dátumok: mindig a projekt objektumból olvassuk a startDate / endDate mezőket
+        // támogassunk korábbi mezőneveket (start, end, from, to) mint fallback
+        let pStart = parseDateField(proj.startDate || proj.start || proj.from || proj.start_date);
+        let pEnd = parseDateField(proj.endDate || proj.end || proj.to || proj.end_date);
+
+        // ha a dátumok fordítva lennének, cseréljük őket
+        if (pStart && pEnd && pStart > pEnd) {
+            const tmp = pStart; pStart = pEnd; pEnd = tmp;
+        }
 
     if (pStart && pEnd && !isNaN(pStart) && !isNaN(pEnd)) {
       // clamp a timeline határaihoz
@@ -1356,8 +1375,8 @@
         bar.textContent = 'Kívül esik';
         content.appendChild(bar);
       } else {
-        const clampedStart = pStart < timelineStart ? timelineStart : pStart;
-        const clampedEnd = pEnd > timelineEnd ? timelineEnd : pEnd;
+    const clampedStart = pStart < timelineStart ? timelineStart : pStart;
+    const clampedEnd = pEnd > timelineEnd ? timelineEnd : pEnd;
         const offsetDays = Math.round((clampedStart - timelineStart) / msPerDay);
         const durationDays = Math.max(1, Math.ceil((clampedEnd - clampedStart) / msPerDay) + 1);
         const leftPx = offsetDays * dayWidth;
@@ -1367,7 +1386,7 @@
         bar.className = 'gantt-bar';
         bar.style.left = leftPx + 'px';
         bar.style.width = Math.max(6, widthPx) + 'px';
-        bar.textContent = `${formatDateNoTime(pStart)} – ${formatDateNoTime(pEnd)}`;
+    bar.textContent = `${formatDateNoTime(clampedStart)} – ${formatDateNoTime(clampedEnd)}`;
         content.appendChild(bar);
       }
     } else {
@@ -1632,4 +1651,3 @@ function escapeForShell(s) {
     </script>
 </body>
 </html>
-
