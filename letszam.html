@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1Hunep - Erőforrás Hozzárendelés</title>
+    <title>Hunep - Erőforrás Hozzárendelés</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -525,6 +525,93 @@
         @keyframes slideInBar {
             from { width: 0; opacity: 0; }
             to { width: auto; opacity: 1; }
+        }
+
+        /* GANTT - horizontális görgethető konténer */
+        .gantt-scroll {
+          overflow-x: auto;
+          overflow-y: visible;
+          width: 100%;
+          border: 1px solid #ddd;
+          background: #fff;
+        }
+
+        /* belső tartalom, szélessége dinamikus (JS állítja) */
+        .gantt-inner {
+          position: relative;
+          height: auto;
+          min-height: 300px;
+          white-space: nowrap;
+        }
+
+        /* timeline header (14 napos sávok) */
+        .gantt-timeline-header {
+          position: relative;
+          height: 40px;
+          border-bottom: 1px solid #ccc;
+          background: #f7f9fc;
+        }
+
+        /* függőleges vonalak és címkék */
+        .gantt-timeline-header .grid-line {
+          position: absolute;
+          top: 0;
+          height: 100%;
+          width: 1px;
+          background: #e0e0e0;
+        }
+        .gantt-timeline-header .date-label {
+          position: absolute;
+          top: 4px;
+          font-size: 12px;
+          color: #333;
+          transform: translateX(-2px);
+        }
+
+        /* sorok */
+        .gantt-row {
+          position: relative;
+          height: 50px;
+          border-bottom: 1px solid #eee;
+        }
+
+        /* baloldali label (fix szélesség) */
+        .gantt-label {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 200px;
+          height: 100%;
+          text-align: right;
+          padding-right: 10px;
+          line-height: 50px;
+          box-sizing: border-box;
+          background: #fff;
+        }
+
+        /* jobb tartalom (időskála rész) */
+        .gantt-row-content {
+          position: absolute;
+          left: 210px; /* label + gap */
+          top: 0;
+          height: 100%;
+          overflow: visible;
+        }
+
+        /* projekt sáv */
+        .gantt-bar {
+          position: absolute;
+          height: 28px;
+          top: 11px;
+          background: #005baa;
+          color: #fff;
+          border-radius: 4px;
+          text-align: center;
+          font-size: 12px;
+          line-height: 28px;
+          overflow: hidden;
+          white-space: nowrap;
+          padding: 0 6px;
         }
 
         /* Responsive design */
@@ -1157,392 +1244,139 @@
 
         // GANTT diagram generálása
         function generateGanttChart() {
-            if (projects.length === 0) {
-                alert('Nincsenek projektek a GANTT diagramhoz!');
-                return;
-            }
+  const ganttContainer = document.getElementById('ganttContainer');
+  if (!ganttContainer) return;
 
-            const container = document.getElementById('ganttContainer');
-            container.innerHTML = '';
+  // FIX időtartam: 2025-09-01 .. 2026-12-31
+  const timelineStart = new Date(2025, 8, 1); // hónap: 0-alapú -> 8 = szeptember
+  const timelineEnd = new Date(2026, 11, 31); // 11 = december
 
-            // Fixed timeline: 2025-09-01 .. 2026-12-31
-            const timelineStart = new Date('2025-09-01');
-            const timelineEnd = new Date('2026-12-31');
-            const msPerDay = 1000 * 60 * 60 * 24;
-            const totalDays = Math.ceil((timelineEnd - timelineStart) / msPerDay) + 1;
+  // beállítások
+  const dayWidth = 6; // pixel / nap (állítható)
+  const bandDays = 14; // két hetes sávozás
+  const labelLeftWidth = 210; // megegyezik a .gantt-label/row-content left értékkel
 
-            // Layout: pixels per day -> choose so two-week band is comfortable
-            const pixelsPerDay = 6; // 14 days -> 84px band width
-            const timelineWidth = totalDays * pixelsPerDay;
+  // számolások
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = Math.ceil((timelineEnd - timelineStart) / msPerDay) + 1;
+  const timelineWidth = totalDays * dayWidth;
 
-            // Header + timeline wrapper
-            const chart = document.createElement('div');
-            chart.className = 'gantt-chart';
+  // felépítés
+  ganttContainer.innerHTML = '';
 
-            const header = document.createElement('div');
-            header.className = 'gantt-header';
-            header.innerHTML = `
-                <div class="gantt-header-cell">Projekt neve</div>
-                <div class="gantt-header-cell">Időtartam és hozzárendelések</div>
-            `;
-            chart.appendChild(header);
+  const scroll = document.createElement('div');
+  scroll.className = 'gantt-scroll';
 
-            // Timeline top area (bands and grid)
-            const timelineWrapper = document.createElement('div');
-            timelineWrapper.className = 'gantt-timeline-wrapper';
-            const timelineInner = document.createElement('div');
-            timelineInner.className = 'gantt-timeline-inner';
-            timelineInner.style.minWidth = timelineWidth + 'px';
+  const inner = document.createElement('div');
+  inner.className = 'gantt-inner';
+  inner.style.width = (labelLeftWidth + timelineWidth) + 'px';
 
-            // Render 14-day bands starting from timelineStart
-            let bandStart = new Date(timelineStart.getTime());
-            while (bandStart <= timelineEnd) {
-                const bandEnd = new Date(bandStart.getTime() + (14 * msPerDay) - msPerDay);
-                const left = Math.round((bandStart - timelineStart) / msPerDay) * pixelsPerDay;
-                const bandWidthDays = Math.min(Math.ceil((bandEnd - bandStart) / msPerDay) + 1, totalDays - Math.round((bandStart - timelineStart) / msPerDay));
-                const bandWidth = bandWidthDays * pixelsPerDay;
+  // timeline header (14 napos sávok)
+  const header = document.createElement('div');
+  header.className = 'gantt-timeline-header';
+  header.style.width = timelineWidth + 'px';
+  header.style.marginLeft = labelLeftWidth + 'px';
 
-                const band = document.createElement('div');
-                band.className = 'gantt-timeline-band';
-                band.style.left = left + 'px';
-                band.style.width = bandWidth + 'px';
-                band.textContent = `${bandStart.toLocaleDateString()} - ${Math.min(bandEnd, timelineEnd).toLocaleDateString()}`;
-                timelineInner.appendChild(band);
+  // címkék és grid vonalak minden bandDays nap után
+  const startClamped = new Date(timelineStart.getTime());
+  for (let d = 0; d <= totalDays; d += bandDays) {
+    const cur = new Date(startClamped.getTime() + d * msPerDay);
+    const offsetPx = d * dayWidth;
+    const line = document.createElement('div');
+    line.className = 'grid-line';
+    line.style.left = offsetPx + 'px';
+    header.appendChild(line);
 
-                // vertical gridline at band start
-                const grid = document.createElement('div');
-                grid.className = 'gantt-timeline-gridline';
-                grid.style.left = left + 'px';
-                timelineInner.appendChild(grid);
+    const lbl = document.createElement('div');
+    lbl.className = 'date-label';
+    lbl.style.left = offsetPx + 'px';
+    // formázás: év.hónap.nap (pl. 2025.09.01)
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const day = String(cur.getDate()).padStart(2, '0');
+    lbl.textContent = `${y}.${m}.${day}`;
+    header.appendChild(lbl);
+  }
 
-                bandStart.setDate(bandStart.getDate() + 14);
-            }
+  inner.appendChild(header);
 
-            timelineWrapper.appendChild(timelineInner);
-            chart.appendChild(timelineWrapper);
+  // sorok: minden projekthoz egy sor
+  projects.forEach((proj, idx) => {
+    const row = document.createElement('div');
+    row.className = 'gantt-row';
+    row.style.width = labelLeftWidth + timelineWidth + 'px';
 
-            // Projects rows
-            const sortedProjects = [...projects].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-            sortedProjects.forEach(project => {
-                const row = document.createElement('div');
-                row.className = 'gantt-row';
+    const label = document.createElement('div');
+    label.className = 'gantt-label';
+    label.textContent = proj.name || `Projekt ${proj.id || idx + 1}`;
+    row.appendChild(label);
 
-                const nameCell = document.createElement('div');
-                nameCell.className = 'gantt-project-name';
-                nameCell.textContent = project.name;
+    const content = document.createElement('div');
+    content.className = 'gantt-row-content';
+    content.style.width = timelineWidth + 'px';
 
-                const timelineCell = document.createElement('div');
-                timelineCell.className = 'gantt-timeline';
-                timelineCell.style.position = 'relative';
-                timelineCell.style.minWidth = timelineWidth + 'px';
+    // projekt dátumok: keresés input mezőkből, vagy a projekt objektumból
+    const startInput = document.getElementById(`start-date-${proj.id}`);
+    const endInput = document.getElementById(`end-date-${proj.id}`);
+    let pStart = startInput && startInput.value ? new Date(startInput.value) : (proj.start ? new Date(proj.start) : null);
+    let pEnd = endInput && endInput.value ? new Date(endInput.value) : (proj.end ? new Date(proj.end) : null);
 
-                // If project has valid dates, render bar with calculated position and width
-                if (project.startDate && project.endDate) {
-                    const start = new Date(project.startDate);
-                    const end = new Date(project.endDate);
-                    // clamp to timeline
-                    const clampedStart = start < timelineStart ? timelineStart : start;
-                    const clampedEnd = end > timelineEnd ? timelineEnd : end;
-                    const offsetDays = Math.round((clampedStart - timelineStart) / msPerDay);
-                    const durationDays = Math.max(1, Math.round((clampedEnd - clampedStart) / msPerDay) + 1);
+    if (pStart && pEnd && !isNaN(pStart) && !isNaN(pEnd)) {
+      // clamp a timeline határaihoz
+      if (pEnd < timelineStart || pStart > timelineEnd) {
+        // teljesen kívül esik -> jelzés "kívül" rövid sáv
+        const bar = document.createElement('div');
+        bar.className = 'gantt-bar';
+        bar.style.left = '0px';
+        bar.style.width = '80px';
+        bar.style.background = '#bbb';
+        bar.textContent = 'Kívül esik';
+        content.appendChild(bar);
+      } else {
+        const clampedStart = pStart < timelineStart ? timelineStart : pStart;
+        const clampedEnd = pEnd > timelineEnd ? timelineEnd : pEnd;
+        const offsetDays = Math.round((clampedStart - timelineStart) / msPerDay);
+        const durationDays = Math.max(1, Math.ceil((clampedEnd - clampedStart) / msPerDay) + 1);
+        const leftPx = offsetDays * dayWidth;
+        const widthPx = durationDays * dayWidth;
 
-                    const bar = document.createElement('div');
-                    bar.className = 'gantt-bar';
-                    bar.style.position = 'absolute';
-                    bar.style.left = (offsetDays * pixelsPerDay) + 'px';
-                    bar.style.width = (durationDays * pixelsPerDay) + 'px';
-                    bar.style.top = '10px';
-                    bar.style.height = '30px';
-                    bar.textContent = `${project.startDate} – ${project.endDate}`;
-                    timelineCell.appendChild(bar);
-                } else {
-                    // no dates
-                    const noDate = document.createElement('div');
-                    noDate.className = 'gantt-bar';
-                    noDate.style.position = 'absolute';
-                    noDate.style.left = '0px';
-                    noDate.style.top = '10px';
-                    noDate.style.height = '30px';
-                    noDate.textContent = 'Nincs dátum';
-                    timelineCell.appendChild(noDate);
-                }
+        const bar = document.createElement('div');
+        bar.className = 'gantt-bar';
+        bar.style.left = leftPx + 'px';
+        bar.style.width = Math.max(6, widthPx) + 'px';
+        bar.textContent = `${formatDateNoTime(pStart)} – ${formatDateNoTime(pEnd)}`;
+        content.appendChild(bar);
+      }
+    } else {
+      // nincs dátum
+      const bar = document.createElement('div');
+      bar.className = 'gantt-bar';
+      bar.style.left = '0px';
+      bar.style.width = '120px';
+      bar.style.background = '#e0a800';
+      bar.textContent = 'Nincs dátum';
+      content.appendChild(bar);
+    }
 
-                row.appendChild(nameCell);
-                row.appendChild(timelineCell);
-                chart.appendChild(row);
-            });
+    row.appendChild(content);
+    inner.appendChild(row);
+  });
 
-            container.appendChild(chart);
-            // show modal
-            document.getElementById('ganttModal').style.display = 'block';
-        }
+  scroll.appendChild(inner);
+  ganttContainer.appendChild(scroll);
 
-        // GANTT modal bezárása
-        function closeGanttModal() {
-            document.getElementById('ganttModal').style.display = 'none';
-        }
+  // További: látható régió középre fókuszálása (opcionális)
+  // scroll.scrollLeft = 0; // ha akarod, automatikusan görgethetsz ide
+}
 
-        // Kapacitás áttekintés
-        function showCapacityOverview() {
-            const capacityData = employees.map(emp => {
-                const assignments = [];
-                let totalCapacity = 0;
-
-                projects.forEach(project => {
-                    const assignment = project.assignments.find(a => a.id === emp.id);
-                    if (assignment) {
-                        assignments.push(`${project.name}: ${assignment.perc}%`);
-                        totalCapacity += assignment.perc;
-                    }
-                });
-
-                return {
-                    name: emp.name,
-                    role: emp.role,
-                    assignments: assignments,
-                    totalCapacity: totalCapacity
-                };
-            });
-
-            let alertText = 'KAPACITÁS ÁTTEKINTÉS\n\n';
-            capacityData.forEach(emp => {
-                alertText += `${emp.name} (${emp.role})\n`;
-                alertText += `Összes kapacitás: ${emp.totalCapacity}%\n`;
-                if (emp.assignments.length > 0) {
-                    alertText += `Hozzárendelések:\n${emp.assignments.map(a => `  • ${a}`).join('\n')}\n`;
-                } else {
-                    alertText += 'Nincs hozzárendelés\n';
-                }
-                alertText += '\n';
-            });
-
-            alert(alertText);
-        }
-
-        // Összehasonlító diagram
-        function generateComparisonChart() {
-            if (projects.length === 0) {
-                alert('Nincsenek projektek az összehasonlításhoz!');
-                return;
-            }
-
-            const comparisonData = projects.map(project => {
-                const startDate = new Date(project.startDate);
-                const endDate = new Date(project.endDate);
-                const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-                
-                return {
-                    name: project.name,
-                    duration: duration,
-                    assignmentCount: project.assignments.length,
-                    totalCapacity: project.assignments.reduce((sum, a) => sum + a.perc, 0)
-                };
-            });
-
-            let chartText = 'PROJEKT ÖSSZEHASONLÍTÁS\n\n';
-            comparisonData.forEach(project => {
-                chartText += `${project.name}:\n`;
-                chartText += `  Időtartam: ${project.duration} nap\n`;
-                chartText += `  Dolgozók száma: ${project.assignmentCount}\n`;
-                chartText += `  Összes kapacitás: ${project.totalCapacity}%\n\n`;
-            });
-
-            alert(chartText);
-        }
-
-        // Állapot mentése
-        function saveState() {
-            try {
-                const state = {
-                    projects: projects,
-                    employees: employees,
-                    timestamp: new Date().toISOString(),
-                    version: '1.0'
-                };
-                localStorage.setItem('hunep-resource-state', JSON.stringify(state));
-                alert('Állapot sikeresen elmentve!');
-            } catch (error) {
-                console.error('Mentési hiba:', error);
-                alert('Hiba történt a mentés során!');
-            }
-        }
-
-        // Állapot betöltése
-        function loadState() {
-            try {
-                const saved = localStorage.getItem('hunep-resource-state');
-                if (saved) {
-                    const state = JSON.parse(saved);
-                    if (confirm(`Betölti a mentett állapotot? (${new Date(state.timestamp).toLocaleString('hu-HU')})\nA jelenlegi adatok elvesznek!`)) {
-                        projects = state.projects || [];
-                        employees = state.employees || [];
-                        renderProjects();
-                        renderEmployees();
-                        alert('Állapot sikeresen betöltve!');
-                    }
-                } else {
-                    alert('Nincs mentett állapot!');
-                }
-            } catch (error) {
-                console.error('Betöltési hiba:', error);
-                alert('Hiba történt a betöltés során!');
-            }
-        }
-
-        // PDF mentés
-        function saveToPDF() {
-            if (typeof jsPDF === 'undefined') {
-                alert('PDF könyvtár nem elérhető!');
-                return;
-            }
-
-            try {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-
-                // Fejléc
-                doc.setFontSize(18);
-                doc.text('Hunep - Erőforrás Hozzárendelés', 20, 20);
-                
-                doc.setFontSize(12);
-                doc.text(`Generálva: ${new Date().toLocaleString('hu-HU')}`, 20, 30);
-
-                let y = 50;
-
-                // Projektek
-                doc.setFontSize(14);
-                doc.text('PROJEKTEK:', 20, y);
-                y += 10;
-
-                projects.forEach((project, index) => {
-                    if (y > 270) { // Új oldal
-                        doc.addPage();
-                        y = 20;
-                    }
-
-                    doc.setFontSize(12);
-                    doc.text(`${index + 1}. ${project.name}`, 20, y);
-                    y += 8;
-                    
-                    doc.setFontSize(10);
-                    doc.text(`Időtartam: ${project.startDate} - ${project.endDate}`, 30, y);
-                    y += 6;
-                    
-                    if (project.assignments && project.assignments.length > 0) {
-                        doc.text('Hozzárendelések:', 30, y);
-                        y += 6;
-                        
-                        project.assignments.forEach(assignment => {
-                            if (y > 270) {
-                                doc.addPage();
-                                y = 20;
-                            }
-                            doc.text(`• ${assignment.name} (${assignment.role}) - ${assignment.perc}%`, 40, y);
-                            y += 5;
-                        });
-                    } else {
-                        doc.text('Nincs hozzárendelés', 30, y);
-                        y += 6;
-                    }
-                    y += 5;
-                });
-
-                // Dolgozók áttekintése
-                if (y > 200) {
-                    doc.addPage();
-                    y = 20;
-                }
-
-                doc.setFontSize(14);
-                doc.text('DOLGOZÓK ÖSSZESÍTÉSE:', 20, y);
-                y += 10;
-
-                const roleGroups = employees.reduce((groups, emp) => {
-                    if (!groups[emp.role]) groups[emp.role] = [];
-                    groups[emp.role].push(emp);
-                    return groups;
-                }, {});
-
-                Object.keys(roleGroups).forEach(role => {
-                    if (y > 270) {
-                        doc.addPage();
-                        y = 20;
-                    }
-                    
-                    doc.setFontSize(11);
-                    doc.text(`${role} (${roleGroups[role].length} fő):`, 20, y);
-                    y += 6;
-                    
-                    doc.setFontSize(9);
-                    roleGroups[role].forEach(emp => {
-                        if (y > 270) {
-                            doc.addPage();
-                            y = 20;
-                        }
-                        doc.text(`• ${emp.name}`, 30, y);
-                        y += 4;
-                    });
-                    y += 4;
-                });
-
-                doc.save(`hunep-eroforras-hozzarendeles-${new Date().toISOString().split('T')[0]}.pdf`);
-            } catch (error) {
-                console.error('PDF generálási hiba:', error);
-                alert('Hiba történt a PDF generálás során!');
-            }
-        }
-
-        // Tab kezelés
-        function showTab(tab) {
-            // Jelenleg minden egy oldalon van, de később bővíthető
-            console.log('Tab váltás:', tab);
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey) {
-                switch(e.key) {
-                    case 's':
-                        e.preventDefault();
-                        saveState();
-                        break;
-                    case 'o':
-                        e.preventDefault();
-                        loadState();
-                        break;
-                    case 'n':
-                        e.preventDefault();
-                        if (e.shiftKey) {
-                            showNewEmployeeModal();
-                        } else {
-                            document.getElementById('projectNameInput').focus();
-                        }
-                        break;
-                    case 'g':
-                        e.preventDefault();
-                        generateGanttChart();
-                        break;
-                }
-            }
-            
-            if (e.key === 'Escape') {
-                closePercentageModal();
-                closeNewEmployeeModal();
-                closeGanttModal();
-            }
-        });
-
-        // Modal click outside bezárás
-        window.addEventListener('click', function(e) {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(modal => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
-        });
-
-        console.log('Hunep Erőforrás Hozzárendelés rendszer betöltve');
+// segédfüggvény (yyyy.mm.dd)
+function formatDateNoTime(d) {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}.${m}.${day}`;
+}
     </script>
 </body>
 </html>
