@@ -6,166 +6,86 @@
   <title>Hunep - Erőforrás Hozzárendelés</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: Arial, sans-serif;
-      background-color:#f5f5f5; color:#333; line-height:1.6;
-    }
-    header {
-      background: linear-gradient(90deg,#2e5bba,#1e4a8c); color:#fff;
-      padding:15px 0; position:sticky; top:0; z-index:100;
-      box-shadow:0 2px 10px rgba(0,0,0,0.1);
-    }
-    .header-content {
-      max-width:1400px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 20px;
-    }
-    .logo { display:flex; align-items:center; gap:10px; font-size:24px; font-weight:bold; }
-    .logo::before { content:"🏗️"; font-size:30px; }
-    nav { display:flex; gap:8px; flex-wrap:wrap; }
-    nav button {
-      background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3);
-      color:#fff; padding:8px 16px; border-radius:4px; cursor:pointer; transition:.3s; font-size:14px;
-    }
-    nav button:hover { background:rgba(255,255,255,0.2); transform:translateY(-1px); }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial, sans-serif;background:#f5f5f5;color:#333;line-height:1.6}
+    header{background:linear-gradient(90deg,#2e5bba,#1e4a8c);color:#fff;padding:15px 0;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+    .header-content{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+    .logo{display:flex;align-items:center;gap:10px;font-size:24px;font-weight:bold}
+    .logo::before{content:"🏗️";font-size:30px}
+    nav{display:flex;gap:8px;flex-wrap:wrap}
+    nav button{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 16px;border-radius:4px;cursor:pointer;transition:.3s;font-size:14px}
+    nav button:hover{background:rgba(255,255,255,.2);transform:translateY(-1px)}
+    .container{max-width:1400px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+    .section{background:#fff;border-radius:8px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.1);max-height:80vh;overflow-y:auto}
+    .section h2{color:#2e5bba;margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid #e9ecef;position:sticky;top:0;background:#fff;z-index:10}
+    .create-section{background:#f8f9fa;padding:15px;border-radius:8px;margin-bottom:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .create-section input{padding:10px;border:1px solid #ddd;border-radius:4px;min-width:150px;flex:1}
+    .btn{background:#2e5bba;color:#fff;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;transition:.3s;white-space:nowrap}
+    .btn:hover{background:#1e4a8c;transform:translateY(-1px)}
+    .project{background:#f8f9fa;border:2px solid #e9ecef;border-radius:8px;margin-bottom:15px;padding:15px;transition:.3s;min-height:120px}
+    .project.drag-over{border-color:#2e5bba;background:#e7f1ff;transform:scale(1.02);box-shadow:0 4px 15px rgba(46,91,186,.2)}
+    .project-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .project-header h3{color:#2e5bba;margin:0;padding:5px;border-radius:4px;min-width:150px;outline:none}
+    .project-header h3:focus{background:#fff;outline:2px solid #2e5bba}
+    .delete-btn{background:#dc3545;color:#fff;border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.3s}
+    .delete-btn:hover{background:#c82333;transform:scale(1.1)}
+    .project-dates{display:flex;gap:10px;margin-bottom:10px}
+    .project-dates input{padding:8px;border:1px solid #ddd;border-radius:4px;flex:1}
+    .assignments{min-height:50px;border:1px dashed #ccc;border-radius:4px;padding:10px;background:#fff}
+    .assignments:empty::before{content:"Húzza ide a dolgozókat...";color:#999;font-style:italic}
+    .assignment{background:#28a745;color:#fff;padding:8px 12px;border-radius:4px;margin:4px;display:inline-flex;align-items:center;gap:8px;cursor:grab;transition:.3s;font-size:12px}
+    .assignment:hover{background:#218838;transform:translateY(-1px);box-shadow:0 2px 5px rgba(0,0,0,.2)}
+    .assignment.dragging{opacity:.5}
+    .assignment-remove{background:rgba(255,255,255,.3);border:none;color:#fff;width:16px;height:16px;border-radius:50%;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .role-group{margin-bottom:20px}
+    .role-group h3{color:#495057;margin-bottom:10px;padding:8px 12px;background:#e9ecef;border-radius:4px;font-size:14px}
+    .employee{background:linear-gradient(to right,#dc3545 0%,#dc3545 var(--capacity-used,0%),#17a2b8 var(--capacity-used,0%),#17a2b8 100%);color:#fff;padding:8px 15px;margin:5px;border-radius:4px;cursor:grab;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;transition:.3s;font-size:13px;user-select:none;position:relative}
+    .employee:hover{transform:translateY(-1px);box-shadow:0 2px 5px rgba(0,0,0,.2)}
+    .employee.dragging{opacity:.5}
+    .employee-delete{background:rgba(255,255,255,.3);border:none;color:#fff;width:18px;height:18px;border-radius:50%;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.3s}
+    .employee-delete:hover{background:rgba(255,255,255,.5);transform:scale(1.1)}
+    .modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.5);animation:fadeIn .3s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal-content{background:#fff;margin:5% auto;padding:30px;border-radius:8px;width:90%;max-width:1200px;box-shadow:0 10px 30px rgba(0,0,0,.3);animation:slideIn .3s ease;position:relative}
+    @keyframes slideIn{from{transform:translateY(-50px);opacity:0}to{transform:translateY(0);opacity:1}}
+    .close{color:#aaa;position:absolute;right:12px;top:6px;font-size:28px;font-weight:bold;cursor:pointer;transition:color .3s}
+    .close:hover{color:#333}
+    .modal-actions{position:absolute;left:12px;top:10px;display:flex;gap:8px}
+    .percentage-input{display:flex;align-items:center;gap:10px;margin:20px 0}
+    .percentage-input input{width:100px;padding:8px;border:1px solid #ddd;border-radius:4px;text-align:center;font-size:16px}
+    .form-group{margin:15px 0}
+    .form-group label{display:block;margin-bottom:5px;font-weight:bold;color:#333}
+    .form-group input,.form-group select{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:14px}
+    .btn-group{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+    .btn-secondary{background:#6c757d}.btn-secondary:hover{background:#5a6268}
 
-    .container {
-      max-width:1400px; margin:0 auto; padding:20px; display:grid; grid-template-columns:1fr 1fr; gap:20px;
-    }
-    .section {
-      background:#fff; border-radius:8px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,0.1);
-      max-height:80vh; overflow-y:auto;
-    }
-    .section h2 {
-      color:#2e5bba; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #e9ecef;
-      position:sticky; top:0; background:#fff; z-index:10;
-    }
-    .create-section {
-      background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-    }
-    .create-section input {
-      padding:10px; border:1px solid #ddd; border-radius:4px; min-width:150px; flex:1;
-    }
-    .btn {
-      background:#2e5bba; color:#fff; border:none; padding:10px 20px; border-radius:4px; cursor:pointer; transition:.3s; white-space:nowrap;
-    }
-    .btn:hover { background:#1e4a8c; transform:translateY(-1px); }
+    /* GANTT */
+    .gantt-container{overflow-x:auto;overflow-y:auto;margin-top:20px;border:1px solid #ddd;border-radius:4px;background:#fff;max-width:100%}
+    .gantt-scroll{overflow-x:auto;overflow-y:visible;width:100%;border:1px solid #ddd;background:#fff}
+    .gantt-inner{position:relative;min-height:300px;white-space:nowrap}
+    .gantt-timeline-header{position:relative;height:40px;border-bottom:1px solid #ccc;background:#f7f9fc}
+    .gantt-timeline-header .grid-line{position:absolute;top:0;height:100%;width:1px;background:#e0e0e0}
+    .gantt-timeline-header .date-label{position:absolute;top:4px;font-size:12px;color:#333;transform:translateX(-2px)}
+    .gantt-row{position:relative;height:50px;border-bottom:1px solid #eee}
+    .gantt-label{position:absolute;left:0;top:0;width:210px;height:100%;text-align:right;padding-right:10px;line-height:50px;box-sizing:border-box;background:#fff;font-weight:bold;color:#2e5bba}
+    .gantt-row-content{position:absolute;left:210px;top:0;height:100%;overflow:visible}
+    .gantt-bar{position:absolute;height:28px;top:11px;background:#005baa;color:#fff;border-radius:4px;text-align:center;font-size:12px;line-height:28px;overflow:hidden;white-space:nowrap;padding:0 6px;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+    .gantt-marker{position:absolute;top:0;bottom:0;width:2px;background:#ff2a2a;z-index:5}
+    .gantt-marker-label{position:absolute;top:0;transform:translateX(-50%);font-size:11px;background:#fff;padding:2px 4px;border:1px solid #ff2a2a;border-radius:3px;z-index:6;white-space:nowrap}
 
-    .project {
-      background:#f8f9fa; border:2px solid #e9ecef; border-radius:8px; margin-bottom:15px; padding:15px; transition:.3s; min-height:120px;
-    }
-    .project.drag-over {
-      border-color:#2e5bba; background:#e7f1ff; transform:scale(1.02); box-shadow:0 4px 15px rgba(46,91,186,.2);
-    }
-    .project-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-    .project-header h3 {
-      color:#2e5bba; margin:0; padding:5px; border-radius:4px; min-width:150px; outline:none;
-    }
-    .project-header h3:focus { background:#fff; outline:2px solid #2e5bba; }
-    .delete-btn {
-      background:#dc3545; color:#fff; border:none; width:30px; height:30px; border-radius:50%;
-      cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:.3s;
-    }
-    .delete-btn:hover { background:#c82333; transform:scale(1.1); }
-    .project-dates { display:flex; gap:10px; margin-bottom:10px; }
-    .project-dates input { padding:8px; border:1px solid #ddd; border-radius:4px; flex:1; }
+    /* Kapacitás tábla popup */
+    .cap-table-wrap{overflow:auto;max-height:700px}
+    table.cap{width:100%;border-collapse:collapse;table-layout:fixed}
+    table.cap th, table.cap td{border:1px solid #ddd;padding:6px;font-size:12px;text-align:right}
+    table.cap th.sticky{position:sticky;top:0;background:#f7f9fc;z-index:2}
+    table.cap td.name, table.cap th.name{position:sticky;left:0;text-align:left;background:#fff;z-index:3;white-space:normal}
+    table.cap td.role, table.cap th.role{position:sticky;left:260px;text-align:left;background:#fff;z-index:3;white-space:normal}
+    table.cap th.name{width:260px}
+    table.cap th.role{width:220px}
+    .over{background:#ffe5e5}
 
-    .assignments {
-      min-height:50px; border:1px dashed #ccc; border-radius:4px; padding:10px; background:#fff;
-    }
-    .assignments:empty::before {
-      content:"Húzza ide a dolgozókat..."; color:#999; font-style:italic;
-    }
-    .assignment {
-      background:#28a745; color:#fff; padding:8px 12px; border-radius:4px; margin:4px; display:inline-flex; align-items:center; gap:8px; cursor:grab; transition:.3s; font-size:12px;
-    }
-    .assignment:hover { background:#218838; transform:translateY(-1px); box-shadow:0 2px 5px rgba(0,0,0,.2); }
-    .assignment.dragging { opacity:.5; }
-    .assignment-remove {
-      background:rgba(255,255,255,.3); border:none; color:#fff; width:16px; height:16px; border-radius:50%;
-      font-size:10px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-    }
-
-    .role-group { margin-bottom:20px; }
-    .role-group h3 {
-      color:#495057; margin-bottom:10px; padding:8px 12px; background:#e9ecef; border-radius:4px; font-size:14px;
-    }
-    .employee {
-      background: linear-gradient(to right,#dc3545 0%,#dc3545 var(--capacity-used,0%),#17a2b8 var(--capacity-used,0%),#17a2b8 100%);
-      color:#fff; padding:8px 15px; margin:5px; border-radius:4px; cursor:grab; display:inline-flex; align-items:center; justify-content:space-between; gap:8px; transition:.3s; font-size:13px; user-select:none; position:relative;
-    }
-    .employee:hover { transform:translateY(-1px); box-shadow:0 2px 5px rgba(0,0,0,.2); }
-    .employee.dragging { opacity:.5; }
-    .employee-delete {
-      background:rgba(255,255,255,.3); border:none; color:#fff; width:18px; height:18px; border-radius:50%;
-      font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.3s;
-    }
-    .employee-delete:hover { background:rgba(255,255,255,.5); transform:scale(1.1); }
-
-    .modal {
-      display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,.5); animation:fadeIn .3s ease;
-    }
-    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-    .modal-content {
-      background:#fff; margin:10% auto; padding:30px; border-radius:8px; width:90%; max-width:500px;
-      box-shadow:0 10px 30px rgba(0,0,0,.3); animation:slideIn .3s ease;
-    }
-    @keyframes slideIn { from{transform:translateY(-50px);opacity:0} to{transform:translateY(0);opacity:1} }
-    .close { color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer; transition:color .3s; }
-    .close:hover { color:#333; }
-    .percentage-input { display:flex; align-items:center; gap:10px; margin:20px 0; }
-    .percentage-input input { width:100px; padding:8px; border:1px solid #ddd; border-radius:4px; text-align:center; font-size:16px; }
-
-    .form-group { margin:15px 0; }
-    .form-group label { display:block; margin-bottom:5px; font-weight:bold; color:#333; }
-    .form-group input,.form-group select { width:100%; padding:10px; border:1px solid #ddd; border-radius:4px; font-size:14px; }
-
-    .btn-group { display:flex; gap:10px; justify-content:flex-end; margin-top:20px; }
-    .btn-secondary { background:#6c757d; }
-    .btn-secondary:hover { background:#5a6268; }
-
-    /* --------- GANTT (scroll/inner megközelítés) --------- */
-    .gantt-container {
-      overflow-x:auto; overflow-y:auto; margin-top:20px; border:1px solid #ddd; border-radius:4px; background:#fff; max-width:100%;
-    }
-    .gantt-scroll { overflow-x:auto; overflow-y:visible; width:100%; border:1px solid #ddd; background:#fff; }
-    .gantt-inner { position:relative; height:auto; min-height:300px; white-space:nowrap; }
-    .gantt-timeline-header {
-      position:relative; height:40px; border-bottom:1px solid #ccc; background:#f7f9fc;
-    }
-    .gantt-timeline-header .grid-line {
-      position:absolute; top:0; height:100%; width:1px; background:#e0e0e0;
-    }
-    .gantt-timeline-header .date-label {
-      position:absolute; top:4px; font-size:12px; color:#333; transform:translateX(-2px);
-    }
-    .gantt-row { position:relative; height:50px; border-bottom:1px solid #eee; }
-    .gantt-label {
-      position:absolute; left:0; top:0; width:210px; height:100%; text-align:right; padding-right:10px; line-height:50px; box-sizing:border-box; background:#fff; font-weight:bold; color:#2e5bba;
-    }
-    .gantt-row-content { position:absolute; left:210px; top:0; height:100%; overflow:visible; }
-    .gantt-bar {
-      position:absolute; height:28px; top:11px; background:#005baa; color:#fff; border-radius:4px; text-align:center; font-size:12px; line-height:28px; overflow:hidden; white-space:nowrap; padding:0 6px; box-shadow:0 2px 5px rgba(0,0,0,.2);
-    }
-    /* Piros marker 2026-01-01-re */
-    .gantt-marker {
-      position:absolute; top:0; bottom:0; width:2px; background:#ff2a2a; z-index:5;
-    }
-    .gantt-marker-label {
-      position:absolute; top:0; transform:translateX(-50%); font-size:11px; background:#fff; padding:2px 4px;
-      border:1px solid #ff2a2a; border-radius:3px; z-index:6; white-space:nowrap;
-    }
-
-    /* --------- Responsive --------- */
-    @media (max-width:1200px) {
-      .container { grid-template-columns:1fr; padding:15px; }
-      .header-content { flex-direction:column; gap:15px; }
-      nav { justify-content:center; }
-    }
-    @media (max-width:768px) {
-      nav button { font-size:12px; padding:6px 12px; }
-      .create-section { flex-direction:column; }
-      .create-section input { min-width:100%; }
-    }
+    @media (max-width:1200px){.container{grid-template-columns:1fr;padding:15px} .header-content{flex-direction:column;gap:15px} nav{justify-content:center}}
+    @media (max-width:768px){nav button{font-size:12px;padding:6px 12px}.create-section{flex-direction:column}.create-section input{min-width:100%}}
   </style>
 </head>
 <body>
@@ -175,15 +95,14 @@
     <nav>
       <button onclick="showTab('projects')">Projektek & Dolgozók</button>
       <button onclick="generateGanttChart()">GANTT diagram</button>
-      <button onclick="showNewEmployeeModal()">Új dolgozó</button>
+     
       <button onclick="generateComparisonChart()">Összehasonlító diagram</button>
       <button onclick="showCapacityOverview()">Kapacitás áttekintés</button>
       <button onclick="saveState()">Állapot mentése</button>
       <button onclick="loadState()">Állapot betöltése</button>
-      <button onclick="saveToPDF()">PDF export</button>
       <button onclick="exportStateToFile()">Exportálás (.json)</button>
       <button onclick="triggerImportFile()">Importálás (.json)</button>
-      <button onclick="publishStateToGitHub()">Publish to GitHub</button>
+     
     </nav>
   </div>
 </header>
@@ -212,7 +131,7 @@
 
 <!-- Percentage Modal -->
 <div id="percentageModal" class="modal">
-  <div class="modal-content">
+  <div class="modal-content" style="max-width:500px">
     <span class="close" onclick="closePercentageModal()">&times;</span>
     <h3>Hozzárendelés százaléka</h3>
     <div class="percentage-input">
@@ -229,13 +148,10 @@
 
 <!-- New Employee Modal -->
 <div id="newEmployeeModal" class="modal">
-  <div class="modal-content">
+  <div class="modal-content" style="max-width:500px">
     <span class="close" onclick="closeNewEmployeeModal()">&times;</span>
     <h3>Új dolgozó hozzáadása</h3>
-    <div class="form-group">
-      <label>Név:</label>
-      <input type="text" id="newEmployeeName" placeholder="Teljes név"/>
-    </div>
+    <div class="form-group"><label>Név:</label><input type="text" id="newEmployeeName" placeholder="Teljes név"/></div>
     <div class="form-group">
       <label>Munkakör:</label>
       <select id="newEmployeeRole">
@@ -260,7 +176,10 @@
 
 <!-- GANTT Modal -->
 <div id="ganttModal" class="modal">
-  <div class="modal-content" style="max-width:95%; width:1200px;">
+  <div class="modal-content">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="toggleGanttFullscreen()" id="fsBtn">Teljes képernyő</button>
+    </div>
     <span class="close" onclick="closeGanttModal()">&times;</span>
     <h3>GANTT Diagram</h3>
     <div id="ganttContainer" class="gantt-container"></div>
@@ -268,28 +187,17 @@
 </div>
 
 <script>
-  // ---- Globális állapot ----
+  // ---- Állapot ----
   let projects = [];
   let employees = [];
-  let draggedEmployee = null;
-  let currentDropTarget = null;
-  let pendingEmployeeId = null;
+  let draggedEmployee = null, currentDropTarget = null, pendingEmployeeId = null;
 
   document.addEventListener('DOMContentLoaded', () => {
-    try {
-      loadDefaultData();
-      renderProjects();
-      renderEmployees();
-      console.log('Alkalmazás sikeresen inicializálva');
-    } catch (err) {
-      console.error('Inicializálási hiba:', err);
-      alert('Hiba történt az alkalmazás betöltésekor!');
-    }
+    loadDefaultData(); renderProjects(); renderEmployees();
   });
 
-  // ---- Alapadatok ----
-  function loadDefaultData() {
-    if (projects.length === 0) {
+  function loadDefaultData(){
+    if (!projects.length){
       projects = [
         { id:1, name:"Lauda projekt áthúzódó", startDate:"2025-12-12", endDate:"2026-03-31", assignments:[] },
         { id:2, name:"Bánki felújítás", startDate:"2025-03-01", endDate:"2026-06-30", assignments:[] },
@@ -301,11 +209,10 @@
         { id:8, name:"Szabad kapacitás 2", startDate:"2026-04-01", endDate:"2026-12-31", assignments:[] },
         { id:9, name:"Szabad kapacitás 3", startDate:"2026-08-01", endDate:"2026-12-31", assignments:[] },
         { id:10, name:"BMW vagy bármi más egyéb kis, áthúzódó munka", startDate:"2025-10-01", endDate:"2026-05-31", assignments:[] },
-        { id:11, name:"Sátoraljaújhely szálloda", startDate:"2025-09-01", endDate:"2025-11-15", assignments:[] },
-{ id:12, name:"NYIA áthúzódó elektromos munkák és projektzárás", startDate:"2025-09-01", endDate:"2026-03-31", assignments:[] }
+        { id:11, name:"Sátoraljaújhely szálloda", startDate:"2025-09-01", endDate:"2025-11-15", assignments:[] }
       ];
     }
-    if (employees.length === 0) {
+    if (!employees.length){
       employees = [
         { id:1,  name:"Balogh Bence Sándor", role:"építésvezető" },
         { id:2,  name:"Barta Miklós", role:"építésvezető" },
@@ -342,686 +249,278 @@
         { id:33, name:"Szombathy Szabolcs", role:"főépítésvezető" }
       ];
     }
-
-    // Ha előző állapotból jött assignments, neveket ID-re igazítjuk
-    projects.forEach(project => {
-      if (!Array.isArray(project.assignments)) return;
-      project.assignments = project.assignments.map(a => {
-        const match = employees.find(e => e.name === a.name);
-        return match ? { ...a, id: match.id, role: match.role } : a;
-      });
+    // régi mentésből jövő assignments igazítása név->id
+    projects.forEach(p=>{
+      if (!Array.isArray(p.assignments)) return;
+      p.assignments = p.assignments.map(a=>{
+        const m = employees.find(e=>e.name===a.name);
+        return m? {...a, id:m.id, role:m.role} : a;
+        });
     });
   }
 
-  // ---- Rendererek ----
-  function renderProjects() {
-    const container = document.getElementById('projects-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    projects.forEach(proj => {
-      const projDiv = document.createElement('div');
-      projDiv.className = 'project';
-      projDiv.dataset.projectId = String(proj.id);
-
-      projDiv.innerHTML = `
+  // ---- Render ----
+  function renderProjects(){
+    const c = document.getElementById('projects-container'); if(!c) return; c.innerHTML='';
+    projects.forEach(proj=>{
+      const el = document.createElement('div'); el.className='project'; el.dataset.projectId=String(proj.id);
+      el.innerHTML = `
         <div class="project-header">
           <h3 contenteditable="true" onblur="updateProjectName(this)">${escapeHtml(proj.name)}</h3>
           <button onclick="deleteProject(${proj.id})" class="delete-btn" title="Projekt törlése">×</button>
         </div>
         <div class="project-dates">
-          <input type="date" value="${proj.startDate || ''}" onchange="updateProjectDate(this,'startDate')" title="Kezdő dátum">
-          <input type="date" value="${proj.endDate || ''}" onchange="updateProjectDate(this,'endDate')" title="Befejezés dátuma">
+          <input type="date" value="${proj.startDate||''}" onchange="updateProjectDate(this,'startDate')" title="Kezdő dátum">
+          <input type="date" value="${proj.endDate||''}" onchange="updateProjectDate(this,'endDate')" title="Befejezés dátuma">
         </div>
         <div class="assignments" title="Hozzárendelt dolgozók"></div>
       `;
-
-      // DnD eventek
-      projDiv.addEventListener('dragover', dragOver);
-      projDiv.addEventListener('dragleave', dragLeave);
-      projDiv.addEventListener('drop', dropEmployee);
-
-      // Assignments lista
-      const assignmentsDiv = projDiv.querySelector('.assignments');
-      if (proj.assignments && proj.assignments.length > 0) {
-        proj.assignments.forEach(assignment => {
-          const assignDiv = document.createElement('div');
-          assignDiv.className = 'assignment';
-          assignDiv.innerHTML = `
-            ${escapeHtml(assignment.name)} - ${assignment.perc}%
-            <button class="assignment-remove" onclick="removeAssignment(${proj.id}, ${assignment.id})" title="Hozzárendelés eltávolítása">×</button>
-          `;
-          assignDiv.dataset.assignmentId = String(assignment.id);
-          assignDiv.draggable = true;
-          assignDiv.addEventListener('dragstart', assignmentDragStart);
-          assignDiv.addEventListener('dragend', assignmentDragEnd);
-          assignmentsDiv.appendChild(assignDiv);
-        });
-      }
-
-      container.appendChild(projDiv);
-    });
-  }
-
-  function renderEmployees() {
-    const container = document.getElementById('employees-container');
-    if (!container) return;
-    container.innerHTML = '';
-
-    const grouped = employees.reduce((acc, emp) => {
-      (acc[emp.role] ||= []).push(emp);
-      return acc;
-    }, {});
-
-    const roles = Object.keys(grouped).sort();
-    roles.forEach(role => {
-      const wrap = document.createElement('div');
-      wrap.className = 'role-group';
-      wrap.innerHTML = `<h3>${escapeHtml(role)} (${grouped[role].length} fő)</h3>`;
-
-      grouped[role].sort((a,b)=> a.name.localeCompare(b.name,'hu'));
-      grouped[role].forEach(emp => {
-        let total = 0;
-        const empProjects = [];
-        projects.forEach(p => {
-          const a = p.assignments.find(x => x.id === emp.id);
-          if (a) { total += a.perc; empProjects.push(`${p.name}: ${a.perc}%`); }
-        });
-
-        const empDiv = document.createElement('div');
-        empDiv.className = 'employee';
-        empDiv.draggable = true;
-        empDiv.dataset.employeeId = String(emp.id);
-        empDiv.style.setProperty('--capacity-used', `${Math.min(total,100)}%`);
-        empDiv.innerHTML = `
-          ${escapeHtml(emp.name)} ${total>0 ? `(${total}%)` : ''}
-          <button class="employee-delete" title="Dolgozó törlése">×</button>
-        `;
-
-        // Tooltip
-        let tip = `${emp.name} - ${emp.role}`;
-        tip += total>0 ? `\nKapacitás: ${total}%` : `\nNincs hozzárendelés`;
-        if (empProjects.length) tip += `\nProjektek:\n${empProjects.join('\n')}`;
-        empDiv.title = tip;
-
-        // Események
-        empDiv.addEventListener('dragstart', employeeDragStart);
-        empDiv.addEventListener('dragend', employeeDragEnd);
-        empDiv.querySelector('.employee-delete').addEventListener('click', (ev)=>{
-          ev.stopPropagation();
-          deleteEmployee(emp.id);
-        });
-
-        wrap.appendChild(empDiv);
+      el.addEventListener('dragover',dragOver); el.addEventListener('dragleave',dragLeave); el.addEventListener('drop',dropEmployee);
+      const list = el.querySelector('.assignments');
+      (proj.assignments||[]).forEach(a=>{
+        const ad = document.createElement('div'); ad.className='assignment';
+        ad.innerHTML = `${escapeHtml(a.name)} - ${a.perc}% <button class="assignment-remove" onclick="removeAssignment(${proj.id},${a.id})" title="Hozzárendelés eltávolítása">×</button>`;
+        ad.dataset.assignmentId=String(a.id); ad.draggable=true; ad.addEventListener('dragstart',assignmentDragStart); ad.addEventListener('dragend',assignmentDragEnd);
+        list.appendChild(ad);
       });
-
-      container.appendChild(wrap);
+      c.appendChild(el);
     });
   }
 
-  // ---- Helper ----
-  function escapeHtml(text = '') {
-    const t = String(text);
-    const map = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' };
-    return t.replace(/[&<>"']/g, m => map[m]);
+  function renderEmployees(){
+    const c = document.getElementById('employees-container'); if(!c) return; c.innerHTML='';
+    const grouped = employees.reduce((g,e)=>{(g[e.role]??=[]).push(e);return g;},{});
+    Object.keys(grouped).sort().forEach(role=>{
+      const wrap = document.createElement('div'); wrap.className='role-group';
+      wrap.innerHTML = `<h3>${escapeHtml(role)} (${grouped[role].length} fő)</h3>`;
+      grouped[role].sort((a,b)=>a.name.localeCompare(b.name,'hu')).forEach(emp=>{
+        let total=0, empProjects=[];
+        projects.forEach(p=>{ const a=(p.assignments||[]).find(x=>x.id===emp.id); if(a){total+=a.perc; empProjects.push(`${p.name}: ${a.perc}%`)} });
+        const d=document.createElement('div'); d.className='employee'; d.draggable=true; d.dataset.employeeId=String(emp.id);
+        d.style.setProperty('--capacity-used', `${Math.min(total,100)}%`);
+        d.innerHTML = `${escapeHtml(emp.name)} ${total>0?`(${total}%)`:''} <button class="employee-delete" title="Dolgozó törlése">×</button>`;
+        let tip=`${emp.name} - ${emp.role}`; tip+= total>0?`\nKapacitás: ${total}%`:`\nNincs hozzárendelés`; if(empProjects.length) tip+=`\nProjektek:\n${empProjects.join('\n')}`; d.title=tip;
+        d.addEventListener('dragstart',employeeDragStart); d.addEventListener('dragend',employeeDragEnd);
+        d.querySelector('.employee-delete').addEventListener('click',(ev)=>{ev.stopPropagation();deleteEmployee(emp.id)});
+        wrap.appendChild(d);
+      });
+      c.appendChild(wrap);
+    });
   }
+
+  function escapeHtml(t=''){const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};return String(t).replace(/[&<>"']/g,s=>m[s])}
 
   // ---- Projekt műveletek ----
-  function updateProjectName(h3) {
-    const projectElem = h3.closest('.project');
-    const id = parseInt(projectElem.dataset.projectId,10);
-    const name = h3.textContent.trim();
-    const p = projects.find(x=>x.id===id);
-    if (p && name) p.name = name;
+  function updateProjectName(h3){const id=parseInt(h3.closest('.project').dataset.projectId,10); const p=projects.find(x=>x.id===id); const name=h3.textContent.trim(); if(p&&name) p.name=name;}
+  function updateProjectDate(inp,type){
+    const id=parseInt(inp.closest('.project').dataset.projectId,10); const p=projects.find(x=>x.id===id); if(!p) return;
+    p[type]=inp.value;
+    if(type==='startDate' && p.endDate && p.startDate>p.endDate){alert('A kezdő dátum nem lehet későbbi, mint a befejezés dátuma!');inp.value=p.endDate;p.startDate=p.endDate}
+    if(type==='endDate' && p.startDate && p.endDate<p.startDate){alert('A befejezés dátuma nem lehet korábbi, mint a kezdő dátum!');inp.value=p.startDate;p.endDate=p.startDate}
   }
-  function updateProjectDate(input, type) {
-    const projectElem = input.closest('.project');
-    const id = parseInt(projectElem.dataset.projectId,10);
-    const p = projects.find(x=>x.id===id);
-    if (!p) return;
-    p[type] = input.value;
-    if (type==='startDate' && p.endDate && p.startDate > p.endDate) {
-      alert('A kezdő dátum nem lehet későbbi, mint a befejezés dátuma!');
-      input.value = p.endDate; p.startDate = p.endDate;
-    }
-    if (type==='endDate' && p.startDate && p.endDate < p.startDate) {
-      alert('A befejezés dátuma nem lehet korábbi, mint a kezdő dátum!');
-      input.value = p.startDate; p.endDate = p.startDate;
-    }
-  }
-  function deleteProject(projectId) {
-    if (!confirm('Biztosan törli ezt a projektet? Az összes hozzárendelés is elvész!')) return;
-    projects = projects.filter(p=>p.id!==projectId);
-    renderProjects(); renderEmployees();
-  }
-  function createProject() {
-    const name = document.getElementById('projectNameInput').value.trim();
-    const startDate = document.getElementById('projectStartDate').value;
-    const endDate = document.getElementById('projectEndDate').value;
-    if (!name) return alert('Kérem adja meg a projekt nevét!');
-    if (!startDate || !endDate) return alert('Kérem adja meg a projekt dátumait!');
-    if (startDate > endDate) return alert('A kezdő dátum nem lehet későbbi, mint a befejezés dátuma!');
-
-    projects.push({ id: Date.now(), name, startDate, endDate, assignments: [] });
-    renderProjects();
-    document.getElementById('projectNameInput').value='';
-    document.getElementById('projectStartDate').value='';
-    document.getElementById('projectEndDate').value='';
+  function deleteProject(id){ if(!confirm('Biztosan törli ezt a projektet? Az összes hozzárendelés is elvész!')) return; projects=projects.filter(p=>p.id!==id); renderProjects(); renderEmployees(); }
+  function createProject(){
+    const name=document.getElementById('projectNameInput').value.trim();
+    const s=document.getElementById('projectStartDate').value; const e=document.getElementById('projectEndDate').value;
+    if(!name) return alert('Kérem adja meg a projekt nevét!'); if(!s||!e) return alert('Kérem adja meg a projekt dátumait!'); if(s>e) return alert('A kezdő dátum nem lehet későbbi, mint a befejezés dátuma!');
+    projects.push({id:Date.now(), name, startDate:s, endDate:e, assignments:[]}); renderProjects();
+    document.getElementById('projectNameInput').value=''; document.getElementById('projectStartDate').value=''; document.getElementById('projectEndDate').value='';
   }
 
   // ---- Assignments ----
-  function removeAssignment(projectId, employeeId) {
-    const p = projects.find(x=>x.id===projectId);
-    if (!p) return;
-    p.assignments = p.assignments.filter(a=>a.id!==employeeId);
-    renderProjects(); renderEmployees();
-  }
-
-  // ---- Dolgozó törlés ----
-  function deleteEmployee(employeeId) {
-    const e = employees.find(x=>x.id===employeeId);
-    if (!e) return;
-    const has = projects.some(p=> p.assignments.some(a=>a.id===employeeId));
-    let msg = `Biztosan törli ${e.name} dolgozót?`;
-    if (has) msg += '\n\nFigyelem: A dolgozó projektekhez van hozzárendelve. Minden hozzárendelés is törlődik!';
-    if (!confirm(msg)) return;
-
-    employees = employees.filter(x=>x.id!==employeeId);
-    projects.forEach(p => p.assignments = p.assignments.filter(a=>a.id!==employeeId));
-    renderEmployees(); renderProjects();
-  }
-
-  // ---- Új dolgozó ----
-  function showNewEmployeeModal() {
-    document.getElementById('newEmployeeModal').style.display='block';
-    document.getElementById('newEmployeeName').focus();
-  }
-  function closeNewEmployeeModal() {
-    document.getElementById('newEmployeeModal').style.display='none';
-    document.getElementById('newEmployeeName').value='';
-    document.getElementById('newEmployeeRole').selectedIndex=0;
-  }
-  function addNewEmployee() {
-    const name = document.getElementById('newEmployeeName').value.trim();
-    const role = document.getElementById('newEmployeeRole').value;
-    if (!name) return alert('Kérem adja meg a dolgozó nevét!');
-    if (employees.some(e=> e.name.toLowerCase() === name.toLowerCase()))
-      return alert('Ez a dolgozó már létezik!');
-    employees.push({ id: Date.now(), name, role });
-    renderEmployees(); closeNewEmployeeModal();
+  function removeAssignment(pid,eid){const p=projects.find(x=>x.id===pid); if(!p) return; p.assignments=p.assignments.filter(a=>a.id!==eid); renderProjects(); renderEmployees();}
+  function deleteEmployee(id){
+    const e=employees.find(x=>x.id===id); if(!e) return;
+    const has=projects.some(p=>(p.assignments||[]).some(a=>a.id===id));
+    if(!confirm(`Biztosan törli ${e.name} dolgozót?${has?'\n\nFigyelem: A dolgozó projektekhez van hozzárendelve. Minden hozzárendelés is törlődik!':''}`)) return;
+    employees=employees.filter(x=>x.id!==id); projects.forEach(p=>p.assignments=(p.assignments||[]).filter(a=>a.id!==id)); renderEmployees(); renderProjects();
   }
 
   // ---- Drag & Drop ----
-  function employeeDragStart(e) {
-    draggedEmployee = { id: parseInt(e.target.dataset.employeeId,10), element: e.target };
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed='copy';
-    e.dataTransfer.setData('text/plain',''); // Firefox
-  }
-  function employeeDragEnd(e) {
-    e.target.classList.remove('dragging'); draggedEmployee = null;
-  }
-  function dragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect='copy'; e.currentTarget.classList.add('drag-over'); }
-  function dragLeave(e) {
-    if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over');
-  }
-  function dropEmployee(e) {
-    e.preventDefault(); e.currentTarget.classList.remove('drag-over');
-    if (draggedEmployee) {
-      currentDropTarget = e.currentTarget;
-      pendingEmployeeId = draggedEmployee.id;
-      showPercentageModal();
-    }
-  }
+  function employeeDragStart(e){draggedEmployee={id:parseInt(e.target.dataset.employeeId,10),element:e.target}; e.target.classList.add('dragging'); e.dataTransfer.effectAllowed='copy'; e.dataTransfer.setData('text/plain','')}
+  function employeeDragEnd(e){e.target.classList.remove('dragging'); draggedEmployee=null}
+  function dragOver(e){e.preventDefault(); e.dataTransfer.dropEffect='copy'; e.currentTarget.classList.add('drag-over')}
+  function dragLeave(e){if(!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('drag-over')}
+  function dropEmployee(e){e.preventDefault(); e.currentTarget.classList.remove('drag-over'); if(draggedEmployee){currentDropTarget=e.currentTarget; pendingEmployeeId=draggedEmployee.id; showPercentageModal()}}
 
   // ---- Százalék modal ----
-  function showPercentageModal() {
-    document.getElementById('percentageModal').style.display='block';
-    document.getElementById('percentageInput').focus();
+  function showPercentageModal(){document.getElementById('percentageModal').style.display='block'; document.getElementById('percentageInput').focus()}
+  function closePercentageModal(){document.getElementById('percentageModal').style.display='none'; currentDropTarget=null; pendingEmployeeId=null; document.getElementById('percentageInput').value='100'}
+  function confirmAssignment(){
+    const perc=parseInt(document.getElementById('percentageInput').value,10);
+    if(!perc||perc<1||perc>100) return alert('Kérem adjon meg 1 és 100 között egy egész számot!');
+    if(!currentDropTarget) return alert('Nincs kiválasztott projekt a hozzárendeléshez.');
+    const pid=parseInt(currentDropTarget.dataset.projectId,10); const p=projects.find(x=>x.id===pid); const e=employees.find(x=>x.id===pendingEmployeeId); if(!p||!e) return alert('Hiba: dolgozó vagy projekt nem található.');
+    const ex=(p.assignments||[]).find(a=>a.id===e.id);
+    if(ex){ if(confirm(`${e.name} már hozzá van rendelve ${ex.perc}%-ban. Felülírja ${perc}%-ra?`)) ex.perc=perc; }
+    else { (p.assignments|| (p.assignments=[])).push({id:e.id,name:e.name,role:e.role,perc:perc}); }
+    renderProjects(); renderEmployees(); pendingEmployeeId=null; closePercentageModal();
   }
-  function closePercentageModal() {
-    document.getElementById('percentageModal').style.display='none';
-    currentDropTarget = null; pendingEmployeeId = null;
-    document.getElementById('percentageInput').value='100';
-  }
-  function confirmAssignment() {
-    const percentage = parseInt(document.getElementById('percentageInput').value,10);
-    if (!percentage || percentage<1 || percentage>100) return alert('Kérem adjon meg 1 és 100 között egy egész számot!');
-    if (!currentDropTarget) return alert('Nincs kiválasztott projekt a hozzárendeléshez.');
+  function assignmentDragStart(e){e.target.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', e.target.dataset.assignmentId)}
+  function assignmentDragEnd(e){e.target.classList.remove('dragging')}
 
-    const projectId = parseInt(currentDropTarget.dataset.projectId,10);
-    const project = projects.find(p=>p.id===projectId);
-    const employee = employees.find(e=>e.id===pendingEmployeeId);
-    if (!project || !employee) return alert('Hiba: dolgozó vagy projekt nem található.');
+  // ---- GANTT + Fullscreen ----
+  function generateGanttChart(){
+    const wrap=document.getElementById('ganttContainer'); if(!wrap) return;
+    const timelineStart=new Date(2025,8,1);    // 2025-09-01
+    const timelineEnd  =new Date(2026,11,31);  // 2026-12-31
+    const dayWidth=6, bandDays=14, labelLeftWidth=210, msPerDay=86400000;
+    const totalDays=Math.ceil((timelineEnd - timelineStart)/msPerDay)+1, timelineWidth=totalDays*dayWidth;
 
-    const existing = project.assignments.find(a=>a.id===employee.id);
-    if (existing) {
-      if (confirm(`${employee.name} már hozzá van rendelve ehhez a projekthez ${existing.perc}%-ban. Felülírja ${percentage}%-ra?`)) {
-        existing.perc = percentage;
-      }
-    } else {
-      project.assignments.push({ id: employee.id, name: employee.name, role: employee.role, perc: percentage });
-    }
-    renderProjects(); renderEmployees();
-    pendingEmployeeId = null; closePercentageModal();
-  }
+    wrap.innerHTML='';
+    const scroll=document.createElement('div'); scroll.className='gantt-scroll';
+    const inner=document.createElement('div'); inner.className='gantt-inner'; inner.style.width=(labelLeftWidth+timelineWidth)+'px';
 
-  function assignmentDragStart(e) {
-    e.target.classList.add('dragging');
-    e.dataTransfer.effectAllowed='move';
-    e.dataTransfer.setData('text/plain', e.target.dataset.assignmentId);
-  }
-  function assignmentDragEnd(e) {
-    e.target.classList.remove('dragging');
-  }
-
-  // ---- GANTT ----
-  function generateGanttChart() {
-    const ganttContainer = document.getElementById('ganttContainer');
-    if (!ganttContainer) return;
-
-    // Fix időtartam
-    const timelineStart = new Date(2025,8,1);   // 2025-09-01
-    const timelineEnd   = new Date(2026,11,31); // 2026-12-31
-    const dayWidth = 6;
-    const bandDays = 14;
-    const labelLeftWidth = 210;
-
-    const msPerDay = 1000*60*60*24;
-    const totalDays = Math.ceil((timelineEnd - timelineStart)/msPerDay) + 1;
-    const timelineWidth = totalDays * dayWidth;
-
-    ganttContainer.innerHTML = '';
-
-    const scroll = document.createElement('div');
-    scroll.className = 'gantt-scroll';
-
-    const inner = document.createElement('div');
-    inner.className = 'gantt-inner';
-    inner.style.width = (labelLeftWidth + timelineWidth) + 'px';
-
-    const header = document.createElement('div');
-    header.className = 'gantt-timeline-header';
-    header.style.width = timelineWidth + 'px';
-    header.style.marginLeft = labelLeftWidth + 'px';
-
-    for (let d=0; d<=totalDays; d+=bandDays) {
-      const cur = new Date(timelineStart.getTime() + d*msPerDay);
-      const offsetPx = d * dayWidth;
-      const line = document.createElement('div');
-      line.className = 'grid-line';
-      line.style.left = offsetPx + 'px';
-      header.appendChild(line);
-
-      const lbl = document.createElement('div');
-      lbl.className = 'date-label';
-      lbl.style.left = offsetPx + 'px';
-      const y = cur.getFullYear();
-      const m = String(cur.getMonth()+1).padStart(2,'0');
-      const dd = String(cur.getDate()).padStart(2,'0');
-      lbl.textContent = `${y}.${m}.${dd}`;
-      header.appendChild(lbl);
+    const header=document.createElement('div'); header.className='gantt-timeline-header'; header.style.width=timelineWidth+'px'; header.style.marginLeft=labelLeftWidth+'px';
+    for(let d=0; d<=totalDays; d+=bandDays){
+      const cur=new Date(timelineStart.getTime()+d*msPerDay); const left=d*dayWidth;
+      const line=document.createElement('div'); line.className='grid-line'; line.style.left=left+'px'; header.appendChild(line);
+      const lab=document.createElement('div'); lab.className='date-label'; lab.style.left=left+'px';
+      lab.textContent=`${cur.getFullYear()}.${String(cur.getMonth()+1).padStart(2,'0')}.${String(cur.getDate()).padStart(2,'0')}`;
+      header.appendChild(lab);
     }
     inner.appendChild(header);
 
-    function parseDateField(v) {
-      if (!v) return null;
-      if (v instanceof Date) return v;
-      const s = String(v).trim();
-      if (!s) return null;
-      const norm = s.replace(/\./g,'-').replace(/\s+/g,'');
-      const d = new Date(norm);
-      if (!isNaN(d)) return d;
-      const m = s.match(/^(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})$/);
-      if (m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-      return null;
-    }
+    function parseDate(v){ if(!v) return null; const s=String(v).trim(); const d=new Date(s.replace(/\./g,'-').replace(/\s+/g,'')); return isNaN(d)?null:d; }
 
-    // PROJEKT SOROK
-    projects.forEach((proj, idx) => {
-      const row = document.createElement('div');
-      row.className = 'gantt-row';
-      row.style.width = (labelLeftWidth + timelineWidth) + 'px';
+    projects.forEach((proj,idx)=>{
+      const row=document.createElement('div'); row.className='gantt-row'; row.style.width=(labelLeftWidth+timelineWidth)+'px';
+      const label=document.createElement('div'); label.className='gantt-label'; label.textContent=proj.name||`Projekt ${proj.id||idx+1}`; row.appendChild(label);
+      const content=document.createElement('div'); content.className='gantt-row-content'; content.style.width=timelineWidth+'px';
 
-      const label = document.createElement('div');
-      label.className = 'gantt-label';
-      label.textContent = proj.name || `Projekt ${proj.id || idx+1}`;
-      row.appendChild(label);
-
-      const content = document.createElement('div');
-      content.className = 'gantt-row-content';
-      content.style.width = timelineWidth + 'px';
-
-      let pStart = parseDateField(proj.startDate || proj.start || proj.from || proj.start_date);
-      let pEnd   = parseDateField(proj.endDate   || proj.end   || proj.to   || proj.end_date);
-      if (pStart && pEnd && pStart > pEnd) [pStart, pEnd] = [pEnd, pStart];
-
-      if (pStart && pEnd && !isNaN(pStart) && !isNaN(pEnd)) {
-        if (pEnd < timelineStart || pStart > timelineEnd) {
-          const bar = document.createElement('div');
-          bar.className = 'gantt-bar';
-          bar.style.left = '0px';
-          bar.style.width = '100px';
-          bar.style.background = '#999';
-          bar.textContent = 'Kívül esik';
-          content.appendChild(bar);
+      let s=parseDate(proj.startDate), e=parseDate(proj.endDate); if(s&&e&&s>e){const t=s;s=e;e=t}
+      if(s&&e){
+        if(e < timelineStart || s > timelineEnd){
+          const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='100px'; bar.style.background='#999'; bar.textContent='Kívül esik'; content.appendChild(bar);
         } else {
-          const clampedStart = pStart < timelineStart ? timelineStart : pStart;
-          const clampedEnd   = pEnd   > timelineEnd   ? timelineEnd   : pEnd;
-          const offsetDays = Math.round((clampedStart - timelineStart)/msPerDay);
-          const durationDays = Math.max(1, Math.ceil((clampedEnd - clampedStart)/msPerDay) + 1);
-          const leftPx = offsetDays * dayWidth;
-          const widthPx = durationDays * dayWidth;
-
-          const bar = document.createElement('div');
-          bar.className = 'gantt-bar';
-          bar.style.left = leftPx + 'px';
-          bar.style.width = Math.max(6, widthPx) + 'px';
-          bar.textContent = `${formatDateNoTime(clampedStart)} – ${formatDateNoTime(clampedEnd)}`;
+          const cs = s<timelineStart? timelineStart : s;
+          const ce = e>timelineEnd  ? timelineEnd   : e;
+          const off = Math.round((cs - timelineStart)/msPerDay);
+          const dur = Math.max(1, Math.ceil((ce - cs)/msPerDay)+1);
+          const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left=(off*dayWidth)+'px'; bar.style.width=(Math.max(6,dur*dayWidth))+'px';
+          bar.textContent = `${formatDate(cs)} – ${formatDate(ce)}`;
           content.appendChild(bar);
         }
       } else {
-        const bar = document.createElement('div');
-        bar.className = 'gantt-bar';
-        bar.style.left = '0px';
-        bar.style.width = '120px';
-        bar.style.background = '#e0a800';
-        bar.textContent = 'Nincs dátum';
-        content.appendChild(bar);
+        const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='120px'; bar.style.background='#e0a800'; bar.textContent='Nincs dátum'; content.appendChild(bar);
       }
 
-      row.appendChild(content);
-      inner.appendChild(row);
+      row.appendChild(content); inner.appendChild(row);
     });
 
-    // ---- Piros marker: 2026-01-01 ----
-    const markerDate = new Date(2026, 0, 1); // Jan=0
-    if (markerDate >= timelineStart && markerDate <= timelineEnd) {
-      const offsetDaysToMarker = Math.round((markerDate - timelineStart) / msPerDay);
-      const markerLeftPx = labelLeftWidth + offsetDaysToMarker * dayWidth;
-
-      const marker = document.createElement('div');
-      marker.className = 'gantt-marker';
-      marker.style.left = markerLeftPx + 'px';
-      inner.appendChild(marker);
-
-      const markerLabel = document.createElement('div');
-      markerLabel.className = 'gantt-marker-label';
-      markerLabel.style.left = markerLeftPx + 'px';
-      markerLabel.textContent = '2026-01-01';
-      inner.appendChild(markerLabel);
+    // Piros marker 2026-01-01
+    const markerDate=new Date(2026,0,1);
+    if(markerDate>=timelineStart && markerDate<=timelineEnd){
+      const offDays=Math.round((markerDate - timelineStart)/msPerDay);
+      const leftPx=labelLeftWidth + offDays*dayWidth;
+      const marker=document.createElement('div'); marker.className='gantt-marker'; marker.style.left=leftPx+'px'; inner.appendChild(marker);
+      const markLab=document.createElement('div'); markLab.className='gantt-marker-label'; markLab.style.left=leftPx+'px'; markLab.textContent='2026-01-01'; inner.appendChild(markLab);
     }
 
-    scroll.appendChild(inner);
-    ganttContainer.appendChild(scroll);
-
-    const ganttModalEl = document.getElementById('ganttModal');
-    if (ganttModalEl) ganttModalEl.style.display='block';
+    scroll.appendChild(inner); wrap.appendChild(scroll);
+    document.getElementById('ganttModal').style.display='block';
   }
+  function formatDate(d){return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
 
-  function formatDateNoTime(d) {
-    if (!d) return '';
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const dd = String(d.getDate()).padStart(2,'0');
-    return `${y}.${m}.${dd}`;
+  // Teljes képernyő kapcsoló
+  function toggleGanttFullscreen(){
+    const modal = document.querySelector('#ganttModal .modal-content');
+    const btn = document.getElementById('fsBtn');
+    if (!document.fullscreenElement){
+      modal.requestFullscreen?.();
+      btn.textContent = 'Kilépés teljes képernyőből';
+    } else {
+      document.exitFullscreen?.();
+      btn.textContent = 'Teljes képernyő';
+    }
   }
 
   // ---- UI helper ----
-  function showTab(tab) {
-    const projectsEl = document.getElementById('projects-section');
-    const employeesEl = document.getElementById('employees-section');
-    const container = document.querySelector('.container');
-    if (!projectsEl || !employeesEl || !container) return;
-    if (tab==='employees') {
-      projectsEl.style.display='none'; employeesEl.style.display=''; container.style.gridTemplateColumns='1fr';
-    } else {
-      projectsEl.style.display=''; employeesEl.style.display=''; container.style.gridTemplateColumns='1fr 1fr';
-    }
+  function showTab(tab){
+    const p=document.getElementById('projects-section'), e=document.getElementById('employees-section'), cont=document.querySelector('.container');
+    if(tab==='employees'){p.style.display='none';e.style.display='';cont.style.gridTemplateColumns='1fr'}
+    else {p.style.display='';e.style.display='';cont.style.gridTemplateColumns='1fr 1fr'}
   }
+  function closeGanttModal(){document.getElementById('ganttModal').style.display='none'}
 
-  // ---- Kapacitás áttekintés (HAVI bontás 2025-10-01-től) ----
-  function showCapacityOverview() {
-    // Időablak: 2025-10-01 -> a projektek max. végdátuma (legalább 2026-12-31)
-    const startFrom = new Date(2025, 9, 1);  // 2025-10-01
-    const projectsMaxEnd = projects.reduce((max, p) => {
-      const d = p.endDate ? new Date(p.endDate) : null;
-      return d && !isNaN(d) && d > max ? d : max;
-    }, new Date(2026, 11, 31));              // fallback: 2026-12-31
+  // ---- KAPACITÁS ÁTTEKINTÉS (HAVI, 2025-10-01-től) ----
+  function showCapacityOverview(){
+    const startFrom = new Date(2025,9,1); // 2025-10-01
+    const projectsMaxEnd = projects.reduce((max,p)=>{const d=p.endDate?new Date(p.endDate):null; return d && !isNaN(d) && d>max? d : max}, new Date(2026,11,31));
     const endTo = projectsMaxEnd;
-
-    const months = [];
-    // generáljuk a hónapokat [startOfMonth, endOfMonth]
-    let y = startFrom.getFullYear(), m = startFrom.getMonth();
-    while (true) {
-      const monthStart = new Date(y, m, 1);
-      const monthEnd = new Date(y, m + 1, 0); // hónap utolsó napja
-      if (monthStart > endTo) break;
-      months.push({ start: monthStart, end: monthEnd, label: `${monthStart.getFullYear()}-${String(monthStart.getMonth()+1).padStart(2,'0')}` });
-      // következő hónap
-      m += 1; if (m > 11) { m = 0; y += 1; }
-      if (monthStart.getFullYear() === endTo.getFullYear() && monthStart.getMonth() === endTo.getMonth()) break;
+    const months=[]; let y=startFrom.getFullYear(), m=startFrom.getMonth();
+    while(true){
+      const monthStart=new Date(y,m,1);
+      if(monthStart>endTo) break;
+      const monthEnd=new Date(y,m+1,0);
+      months.push({start:monthStart, end:monthEnd, label:`${monthStart.getFullYear()}-${String(monthStart.getMonth()+1).padStart(2,'0')}`});
+      m++; if(m>11){m=0;y++}
+      if(monthStart.getFullYear()===endTo.getFullYear() && monthStart.getMonth()===endTo.getMonth()) break;
     }
 
-    // nap alapú súlyozás
-    const msPerDay = 1000*60*60*24;
-    function daysDiffInclusive(a,b){ return Math.max(0, Math.floor((b - a)/msPerDay) + 1); }
-    function clamp(d, a, b){ return d < a ? a : (d > b ? b : d); }
+    const DAY=86400000;
+    const daysInclusive=(a,b)=> Math.max(0, Math.floor((b-a)/DAY)+1);
 
-    // Minden dolgozóhoz, minden hónap %-a
-    const rows = employees.map(emp => {
-      const monthPerc = months.map(({start, end}) => {
-        const daysInMonth = daysDiffInclusive(start, end);
-        // összegezzük az összes projekt-hozzárendelést
+    // pontos átfedés: ha nincs metszet, 0 nap!
+    function overlapDays(pStart,pEnd, mStart,mEnd){
+      if (pEnd < mStart || pStart > mEnd) return 0;
+      const s = pStart > mStart ? pStart : mStart;
+      const e = pEnd   < mEnd   ? pEnd   : mEnd;
+      if (e < s) return 0;
+      return daysInclusive(s,e);
+    }
+
+    const rows = employees.map(emp=>{
+      const perMonth = months.map(({start,end})=>{
+        const daysInMonth = daysInclusive(start,end);
         let totalPct = 0;
-        projects.forEach(p => {
+        projects.forEach(p=>{
           if (!Array.isArray(p.assignments) || !p.startDate || !p.endDate) return;
-          const asg = p.assignments.find(a => a.id === emp.id);
-          if (!asg) return;
-          const pStart = new Date(p.startDate);
-          const pEnd = new Date(p.endDate);
-          if (isNaN(pStart) || isNaN(pEnd)) return;
-
-          // átfedő napok a hónappal
-          const overlapStart = clamp(pStart, start, end);
-          const overlapEnd   = clamp(pEnd, start, end);
-          const overlapDays  = (overlapEnd >= overlapStart) ? daysDiffInclusive(overlapStart, overlapEnd) : 0;
-          if (overlapDays > 0) {
-            // napi állandó % feltételezés -> havi átlag = perc * (átfedés napjai / hónap napjai)
-            totalPct += asg.perc * (overlapDays / daysInMonth);
-          }
+          const asg = p.assignments.find(a=>a.id===emp.id); if(!asg) return;
+          const ps = new Date(p.startDate), pe = new Date(p.endDate); if(isNaN(ps)||isNaN(pe)) return;
+          const od = overlapDays(ps,pe,start,end);
+          if (od>0) totalPct += asg.perc * (od / daysInMonth);
         });
-        // kerekítsünk 1 tizedesre
-        return Math.round(totalPct * 10) / 10;
+        return Math.round(totalPct*10)/10; // 1 tizedes
       });
-      return { name: emp.name, role: emp.role, perMonth: monthPerc };
+      return { name: emp.name, role: emp.role, perMonth };
     });
 
-    // popup táblázat felépítése
-    const popup = window.open('', '_blank', 'width=1100,height=800,scrollbars=yes');
-    if (!popup) { alert('Nem sikerült megnyitni a kapacitás áttekintést.'); return; }
-    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Kapacitás áttekintés (havi)</title>';
-    html += '<style>';
-    html += 'body{font-family:Arial;padding:14px}';
-    html += 'h2{color:#2e5bba;margin-bottom:10px}';
-    html += 'table{width:100%;border-collapse:collapse;table-layout:fixed}';
-    html += 'th,td{border:1px solid #ddd;padding:6px; font-size:12px; text-align:right}';
-    html += 'th.sticky{position:sticky; top:0; background:#f7f9fc; z-index:2}';
-    html += 'td.name, th.name{position:sticky; left:0; text-align:left; background:#fff; z-index:1; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}';
-    html += 'td.role, th.role{position:sticky; left:220px; text-align:left; background:#fff; z-index:1; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}';
-    html += '.over{background:#ffe5e5}';
-    html += '</style></head><body>';
-    html += `<h2>Kapacitás áttekintés (havi) — kezdő: 2025-10-01</h2>`;
-    html += '<div style="overflow:auto; max-height:700px;">';
-    html += '<table><thead><tr>';
-    html += '<th class="name sticky">Név</th><th class="role sticky">Szerep</th>';
-    months.forEach(m => { html += `<th class="sticky">${m.label}</th>`; });
-    html += '</tr></thead><tbody>';
-
-    rows.forEach(r => {
-      html += `<tr><td class="name">${escapeHtml(r.name)}</td><td class="role">${escapeHtml(r.role)}</td>`;
-      r.perMonth.forEach(v => {
-        const over = v > 100 ? ' over' : '';
-        html += `<td class="${over}">${v.toFixed(1)}%</td>`;
-      });
-      html += '</tr>';
+    const win=window.open('', '_blank', 'width=1200,height=800,scrollbars=yes');
+    if(!win){ alert('Nem sikerült megnyitni a kapacitás áttekintést.'); return; }
+    let html='<!doctype html><html><head><meta charset="utf-8"><title>Kapacitás áttekintés (havi)</title>';
+    html+='<style>body{font-family:Arial;padding:14px}h2{color:#2e5bba;margin-bottom:10px}</style></head><body>';
+    html+=`<h2>Kapacitás áttekintés (havi) — kezdő: 2025-10-01</h2>`;
+    html+='<div class="cap-table-wrap"><table class="cap"><thead><tr>';
+    html+='<th class="name sticky">Név</th><th class="role sticky">Szerep</th>';
+    months.forEach(m=> html+=`<th class="sticky">${m.label}</th>`);
+    html+='</tr></thead><tbody>';
+    rows.forEach(r=>{
+      html+=`<tr><td class="name">${escapeHtml(r.name)}</td><td class="role">${escapeHtml(r.role)}</td>`;
+      r.perMonth.forEach(v=> html+=`<td class="${v>100?'over':''}">${v.toFixed(1)}%</td>`);
+      html+='</tr>';
     });
-
-    html += '</tbody></table></div></body></html>';
-    popup.document.write(html); popup.document.close();
+    html+='</tbody></table></div></body></html>';
+    win.document.write(html); win.document.close();
   }
 
-  // ---- Állapot mentés/betöltés ----
-  function saveState() {
-    try {
-      localStorage.setItem('hunep_state_v1', JSON.stringify({ projects, employees }));
-      alert('Állapot elmentve a böngészőbe.');
-    } catch (e) {
-      console.error('saveState error', e);
-      alert('Hiba történt az állapot mentésekor.');
-    }
-  }
-  function loadState() {
-    try {
-      const raw = localStorage.getItem('hunep_state_v1');
-      if (!raw) return alert('Nincs mentett állapot.');
-      const state = JSON.parse(raw);
-      if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
-        projects = state.projects; employees = state.employees;
-        renderProjects(); renderEmployees(); alert('Állapot sikeresen betöltve.');
-      } else alert('Érvénytelen mentés formátum.');
-    } catch (e) {
-      console.error('loadState error', e);
-      alert('Hiba történt az állapot betöltésekor.');
-    }
-  }
+  // ---- Mentés/Betöltés/Export/Import/Összehasonlító/PDF/GitHub (változatlan logika) ----
+  function saveState(){try{localStorage.setItem('hunep_state_v1', JSON.stringify({projects,employees})); alert('Állapot elmentve a böngészőbe.');}catch(e){console.error(e);alert('Hiba történt az állapot mentésekor.')}} 
+  function loadState(){try{const raw=localStorage.getItem('hunep_state_v1'); if(!raw) return alert('Nincs mentett állapot.'); const s=JSON.parse(raw); if(s&&Array.isArray(s.projects)&&Array.isArray(s.employees)){projects=s.projects;employees=s.employees;renderProjects();renderEmployees();alert('Állapot sikeresen betöltve.')}else alert('Érvénytelen mentés formátum.')}catch(e){console.error(e);alert('Hiba történt az állapot betöltésekor.')}} 
+  function generateComparisonChart(){try{const p=window.open('', '_blank', 'width=700,height=600,scrollbars=yes'); if(!p){alert(`Összegzés: projektek: ${projects.length}`);return;} let h='<!doctype html><html><head><meta charset="utf-8"><title>Összehasonlító diagram</title><style>body{font-family:Arial;padding:12px}h2{color:#2e5bba}table{width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid #ddd;text-align:left}</style></head><body>'; h+=`<h2>Projektek összegzése (${projects.length})</h2>`; h+='<table><tr><th>Projekt</th><th>Időszak</th><th>Hozzárendelések</th></tr>'; projects.forEach(x=>{const n=x.name||'–'; const pr=`${x.startDate||'–'} — ${x.endDate||'–'}`; const a=Array.isArray(x.assignments)?x.assignments.length:0; h+=`<tr><td>${escapeHtml(n)}</td><td>${escapeHtml(pr)}</td><td>${a}</td></tr>`}); h+='</table></body></html>'; p.document.write(h); p.document.close(); }catch(e){console.error(e);alert('Nem sikerült összehasonlítást készíteni.')}} 
+  function saveToPDF(){try{if(!window.jspdf||!window.jspdf.jsPDF) return alert('jsPDF nem található.'); const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'pt',format:'a4'}); doc.setFontSize(14); doc.text('Hunep - Projektek',40,50); let y=80; projects.forEach(p=>{const line=`${p.name||''} (${p.startDate||''} - ${p.endDate||''})`; doc.setFontSize(11); doc.text(line,40,y); y+=18; if(y>760){doc.addPage(); y=40;}}); doc.save('hunep_projects.pdf'); }catch(e){console.error(e);alert('PDF exportálás nem sikerült.')}} 
+  function exportStateToFile(){try{const blob=new Blob([JSON.stringify({projects,employees},null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='hunep_state.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);}catch(e){console.error(e);alert('Exportálás sikertelen.')}} 
+  function triggerImportFile(){const i=document.createElement('input'); i.type='file'; i.accept='.json,application/json'; i.onchange=handleImportFile; i.click();}
+  function handleImportFile(e){const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=function(){try{const s=JSON.parse(r.result); if(s&&Array.isArray(s.projects)&&Array.isArray(s.employees)){projects=s.projects;employees=s.employees;renderProjects();renderEmployees();alert('Állapot importálva.')}else alert('Érvénytelen fájlformátum.')}catch(err){console.error(err);alert('Hiba az importálás során.')}}; r.readAsText(f); }
+  function publishStateToGitHub(){const repoPath='csab-ai/Csab-AI', targetPath='hunep_state.json', content=JSON.stringify({projects,employees},null,2); const w=window.open('', '_blank'); if(!w){alert('Nem sikerült megnyitni az útmutató ablakot.');return;} let h='<!doctype html><html><head><meta charset="utf-8"><title>Publish state to GitHub</title><style>body{font-family:Arial;padding:14px;}pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;white-space:pre-wrap;word-break:break-word}</style></head><body>'; h+='<h2>Publish state to your GitHub Pages repo</h2><p>A böngésző nem tud közvetlenül commitolni. Kövesd az alábbi módszerek egyikét:</p>'; h+='<h3>Módszer A — Gyors helyi git commit</h3><pre>'; h+=`echo '${String(content).replace(/'/g,"'\\''")}' > ${targetPath}\n`; h+=`git add ${targetPath}\n`; h+=`git commit -m 'Update hunep state'\n`; h+=`git push origin main\n`; h+='</pre><h3>Módszer B — GitHub web UI</h3>'; h+=`<p>Nyisd meg: <a target="_blank" href="https://github.com/${repoPath}/new/main?filename=${targetPath}">Create/Update hunep_state.json</a></p>`; h+='<p>Illeszd be az alábbi JSON-t és commitold:</p>'; h+=`<pre>${escapeHtml(content)}</pre></body></html>`; w.document.write(h); w.document.close(); }
 
-  // ---- Összehasonlító nézet ----
-  function generateComparisonChart() {
-    try {
-      const popup = window.open('', '_blank', 'width=700,height=600,scrollbars=yes');
-      if (!popup) { alert(`Összegzés: projektek: ${projects.length}`); return; }
-      let html = '<!doctype html><html><head><meta charset="utf-8"><title>Összehasonlító diagram</title>';
-      html += '<style>body{font-family:Arial;padding:12px}h2{color:#2e5bba}table{width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid #ddd;text-align:left}</style>';
-      html += '</head><body>';
-      html += `<h2>Projektek összegzése (${projects.length})</h2>`;
-      html += '<table><tr><th>Projekt</th><th>Időszak</th><th>Hozzárendelések</th></tr>';
-      projects.forEach(p=>{
-        const name = p.name || '–';
-        const period = `${p.startDate || '–'} — ${p.endDate || '–'}`;
-        const assigns = Array.isArray(p.assignments) ? p.assignments.length : 0;
-        html += `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(period)}</td><td>${assigns}</td></tr>`;
-      });
-      html += '</table></body></html>';
-      popup.document.write(html); popup.document.close();
-    } catch(e) {
-      console.error('generateComparisonChart error', e);
-      alert('Nem sikerült összehasonlítást készíteni.');
-    }
-  }
-
-  // ---- PDF export ----
-  function saveToPDF() {
-    try {
-      if (!window.jspdf || !window.jspdf.jsPDF) return alert('jsPDF nem található. Ellenőrizze a betöltött könyvtárat.');
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit:'pt', format:'a4' });
-      doc.setFontSize(14);
-      doc.text('Hunep - Projektek', 40, 50);
-      let y = 80;
-      projects.forEach(p=>{
-        const line = `${p.name || ''} (${p.startDate || ''} - ${p.endDate || ''})`;
-        doc.setFontSize(11); doc.text(line, 40, y); y += 18;
-        if (y > 760) { doc.addPage(); y = 40; }
-      });
-      doc.save('hunep_projects.pdf');
-    } catch(e) {
-      console.error('saveToPDF error', e);
-      alert('PDF exportálás nem sikerült.');
-    }
-  }
-
-  // ---- Export/Import ----
-  function exportStateToFile() {
-    try {
-      const blob = new Blob([JSON.stringify({projects, employees}, null, 2)], { type:'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='hunep_state.json';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('exportStateToFile', e);
-      alert('Exportálás sikertelen.');
-    }
-  }
-  function triggerImportFile() {
-    const input = document.createElement('input');
-    input.type='file'; input.accept='.json,application/json'; input.onchange = handleImportFile; input.click();
-  }
-  function handleImportFile(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function() {
-      try {
-        const state = JSON.parse(reader.result);
-        if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
-          projects = state.projects; employees = state.employees;
-          renderProjects(); renderEmployees(); alert('Állapot importálva.');
-        } else alert('Érvénytelen fájlformátum.');
-      } catch (err) {
-        console.error('handleImportFile', err);
-        alert('Hiba az importálás során.');
-      }
-    };
-    reader.readAsText(file);
-  }
-
-  // ---- GitHub publikálás (manuális útmutató) ----
-  function publishStateToGitHub() {
-    const repoPath = 'csab-ai/Csab-AI';
-    const targetPath = 'hunep_state.json';
-    const content = JSON.stringify({projects, employees}, null, 2);
-
-    const w = window.open('', '_blank');
-    if (!w) { alert('Nem sikerült megnyitni az útmutató ablakot.'); return; }
-    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Publish state to GitHub</title>';
-    html += '<style>body{font-family:Arial;padding:14px;}pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;white-space:pre-wrap;word-break:break-word}</style>';
-    html += '</head><body>';
-    html += '<h2>Publish state to your GitHub Pages repo</h2>';
-    html += '<p>A böngésző nem tud közvetlenül commitolni. Kövesd az alábbi módszerek egyikét:</p>';
-    html += '<h3>Módszer A — Gyors helyi git commit</h3>';
-    html += '<pre>';
-    html += `echo '${escapeForShell(content)}' > ${targetPath}\n`;
-    html += `git add ${targetPath}\n`;
-    html += `git commit -m 'Update hunep state'\n`;
-    html += `git push origin main\n`;
-    html += '</pre>';
-    html += '<h3>Módszer B — GitHub web UI</h3>';
-    html += `<p>Nyisd meg: <a href="https://github.com/${repoPath}/new/main?filename=${targetPath}" target="_blank">Create/Update hunep_state.json</a></p>`;
-    html += '<p>Illeszd be az alábbi JSON-t és commitold:</p>';
-    html += `<pre>${escapeHtml(content)}</pre>`;
-    html += '</body></html>';
-    w.document.write(html); w.document.close();
-  }
-  function escapeForShell(s){ return String(s).replace(/'/g,"'\\''"); }
-
-  // ---- Távoli JSON megkísérlése (nem blocking) ----
+  // opcionális: távoli állapot beolvasás
   (function tryLoadRemoteState(){
-    const remoteUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'hunep_state.json';
-    fetch(remoteUrl, { cache:'no-store' })
-      .then(r=>{ if(!r.ok) throw new Error('no remote'); return r.json(); })
-      .then(state=>{
-        if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
-          projects = state.projects; employees = state.employees;
-          document.addEventListener('DOMContentLoaded', ()=>{ renderProjects(); renderEmployees(); });
-          console.log('Loaded remote state from', remoteUrl);
-        }
-      })
-      .catch(()=>{ /* nincs távoli fájl -> nincs teendő */ });
+    const url=window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'hunep_state.json';
+    fetch(url,{cache:'no-store'}).then(r=>{if(!r.ok) throw 0; return r.json()}).then(s=>{
+      if(s&&Array.isArray(s.projects)&&Array.isArray(s.employees)){projects=s.projects;employees=s.employees;document.addEventListener('DOMContentLoaded',()=>{renderProjects();renderEmployees();});}
+    }).catch(()=>{});
   })();
-
-  // ---- GANTT modal bezárás ----
-  function closeGanttModal(){ const el = document.getElementById('ganttModal'); if (el) el.style.display='none'; }
 </script>
 </body>
 </html>
