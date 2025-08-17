@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>4Hunep - Erőforrás Hozzárendelés</title>
+    <title>Hunep - Erőforrás Hozzárendelés</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -672,6 +672,9 @@
                 <button onclick="saveState()">Állapot mentése</button>
                 <button onclick="loadState()">Állapot betöltése</button>
                 <button onclick="saveToPDF()">PDF export</button>
+                <button onclick="exportStateToFile()">Exportálás (.json)</button>
+                <button onclick="triggerImportFile()">Importálás (.json)</button>
+                <button onclick="publishStateToGitHub()">Publish to GitHub</button>
             </nav>
         </div>
     </header>
@@ -780,14 +783,17 @@
         function loadDefaultData() {
             if (projects.length === 0) {
                 projects = [
-                    { id: 1, name: "Lauda projekt 3. ütem (áthúzódó)", startDate: "2025-12-15", endDate: "2026-03-31", assignments: [] },
-                    { id: 6, name: "Bánky felújítás", startDate: "2025-03-01", endDate: "2026-06-30", assignments: [] },
-                    { id: 7, name: "Kossuth utcai társasház", startDate: "2025-08-10", endDate: "2026-08-31", assignments: [] },
-                    { id: 7, name: "Saját - kisebb társasház", startDate: "2026-05-01", endDate: "2026-12-31", assignments: [] },
-                    { id: 7, name: "Saját - nagyobb társasház", startDate: "2026-08-01", endDate: "2026-12-31", assignments: [] },
-                    { id: 10, name: "Szabad kapacitás 1", startDate: "2026-01-01", endDate: "2026-12-31", assignments: [] },
-                    { id: 11, name: "Szabad kapacitás 2", startDate: "2025-03-01", endDate: "2026-12-31", assignments: [] }
-                     { id: 11, name: "Szabad kapacitás 3", startDate: "2025-05-01", endDate: "2026-12-31", assignments: [] }
+                    { id: 1, name: "Lauda projekt 1. ütem", startDate: "2025-02-03", endDate: "2025-07-31", assignments: [] },
+                    { id: 2, name: "Auguszta projekt", startDate: "2025-02-03", endDate: "2025-03-31", assignments: [] },
+                    { id: 3, name: "Lyceum szálloda", startDate: "2025-02-03", endDate: "2025-09-15", assignments: [] },
+                    { id: 4, name: "NYIA Rising csarnok", startDate: "2025-02-03", endDate: "2025-09-30", assignments: [] },
+                    { id: 5, name: "LEGO kantin", startDate: "2025-02-15", endDate: "2025-10-30", assignments: [] },
+                    { id: 6, name: "Bánky felújítás", startDate: "2025-03-01", endDate: "2025-10-30", assignments: [] },
+                    { id: 7, name: "Kossuth utcai társasház", startDate: "2025-02-20", endDate: "2025-12-31", assignments: [] },
+                    { id: 8, name: "Sátoraljaújhely szálloda", startDate: "2025-02-03", endDate: "2025-10-30", assignments: [] },
+                    { id: 9, name: "Balatonakarattya", startDate: "2025-05-01", endDate: "2025-12-31", assignments: [] },
+                    { id: 10, name: "Szabad kapacitás", startDate: "2025-04-01", endDate: "2025-12-31", assignments: [] },
+                    { id: 11, name: "Szabad kapacitás 2", startDate: "2025-07-01", endDate: "2025-12-31", assignments: [] }
                 ];
             }
 
@@ -797,6 +803,7 @@
                     { id: 2, name: "Barta Miklós", role: "építésvezető" },
                     { id: 3, name: "Bencze Zoltán", role: "projektvezető főmérnök" },
                     { id: 4, name: "Bordás Csaba", role: "építésvezető" },
+                    { id: 5, name: "Czinke-Nagy Fanni", role: "előkészítő mérnök" },
                     { id: 6, name: "Deák Viktor", role: "projektvezető mérnök" },
                     { id: 7, name: "Dobi Róbert", role: "főépítésvezető" },
                     { id: 8, name: "Gerzsenyi László", role: "főépítésvezető" },
@@ -804,26 +811,25 @@
                     { id: 10, name: "Hidi Béla", role: "építésvezető" },
                     { id: 11, name: "Hrabovszki János Norbert", role: "projektvezető mérnök" },
                     { id: 12, name: "Hutóczki Kristóf", role: "épületgépész projektmérnök" },
+                    { id: 13, name: "Iglicz Zoltán", role: "munkahelyi technikus" },
                     { id: 14, name: "Kaszonyi Botond", role: "építésvezető" },
                     { id: 15, name: "Kiss Szabolcs Krisztián", role: "építésvezető" },
-                     { id: 15, name: "Uhrin László", role: "építésvezető" },
                     { id: 16, name: "Kulcsár Lajos", role: "szerelőipari főmérnök" },
                     { id: 17, name: "Kunkli Judit", role: "munkahelyi technikus" },
                     { id: 18, name: "Lacza János", role: "előkészítő mérnök" },
                     { id: 19, name: "Laposi Ferenc Ádám", role: "építésvezető" },
-                    { id: 19, name: "Szabó Márk", role: "építésvezető" },
-                    { id: 19, name: "Osán Ádám", role: "építésvezető" },
                     { id: 20, name: "Lisku Gergő", role: "munkahelyi technikus" },
-                    { id: 20, name: "Erdős Ádám", role: "munkahelyi technikus" },
+                    { id: 21, name: "Nánási Attila", role: "építésvezető" },
                     { id: 22, name: "Nemesné Gyöngyösi Katalin Györgyi", role: "előkészítő mérnök" },
                     { id: 23, name: "Oláh András", role: "épületvillamossági projektmérnök" },
                     { id: 24, name: "Pósán Miklós Zoltán", role: "épületvillamossági projektmérnök" },
                     { id: 25, name: "Sáfár Noémi Rozália", role: "előkészítő mérnök" },
+                    { id: 26, name: "Sági Ibolya", role: "előkészítő mérnök" },
                     { id: 27, name: "Sütő Károly", role: "projektvezető főmérnök" },
                     { id: 28, name: "Süvöltős Sándor József", role: "épületgépész projektmérnök" },
-                     { id: 28, name: "Máté Szabolcs", role: "épületgépész projektmérnök" },
                     { id: 29, name: "Szabó Ivett Petronella", role: "szerelőipari asszisztens" },
                     { id: 30, name: "Szarvas Sándor", role: "épületvillamossági projektmérnök" },
+                    { id: 31, name: "Varga Sándor", role: "munkahelyi technikus" },
                     { id: 32, name: "Vigh Tamás", role: "projektvezető főmérnök" }
                 ];
             }
@@ -1500,7 +1506,115 @@ function saveToPDF() {
         alert('PDF exportálás nem sikerült.');
     }
 }
+
+// Export current state as JSON file
+function exportStateToFile() {
+    try {
+        const state = { projects, employees };
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'hunep_state.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error('exportStateToFile', e);
+        alert('Exportálás sikertelen.');
+    }
+}
+
+// Import JSON by opening file picker
+function triggerImportFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = handleImportFile;
+    input.click();
+}
+
+function handleImportFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function() {
+        try {
+            const state = JSON.parse(reader.result);
+            if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
+                projects = state.projects;
+                employees = state.employees;
+                renderProjects();
+                renderEmployees();
+                alert('Állapot importálva.');
+            } else {
+                alert('Érvénytelen fájlformátum.');
+            }
+        } catch (err) {
+            console.error('handleImportFile', err);
+            alert('Hiba az importálás során.');
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Publish state to GitHub - helper that uses Github's unauthenticated gist-like approach is not possible
+// We'll implement a helper that prepares a URL & curl command the user can run locally to commit the JSON to their GitHub Pages repo.
+function publishStateToGitHub() {
+    const repoPath = 'csab-ai/Csab-AI';
+    const targetPath = 'hunep_state.json';
+    const state = { projects, employees };
+    const content = JSON.stringify(state, null, 2);
+
+    // Create a small modal with instructions and the content for manual commit
+    const w = window.open('', '_blank');
+    if (!w) { alert('Nem sikerült megnyitni az útmutató ablakot.'); return; }
+    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Publish state to GitHub</title>';
+    html += '<style>body{font-family:Arial;padding:14px;}pre{background:#f4f4f4;border:1px solid #ddd;padding:10px;white-space:pre-wrap;word-break:break-all;}</style>';
+    html += '</head><body>';
+    html += '<h2>Publish state to your GitHub Pages repo</h2>';
+    html += '<p>Due to browser security, this page cannot directly commit to your GitHub repo. Follow one of the methods below to publish the state file so others see changes:</p>';
+    html += '<h3>Method A — Quick local git commit (recommended)</h3>';
+    html += '<p>Run these commands in a terminal inside a local clone of your repo (replace branch if needed):</p>';
+    html += '<pre>';
+    html += `echo '${escapeForShell(content)}' > ${targetPath}\n`;
+    html += 'git add ' + targetPath + '\n';
+    html += "git commit -m 'Update hunep state'\n";
+    html += 'git push origin main\n';
+    html += '</pre>';
+    html += '<h3>Method B — Use GitHub web UI</h3>';
+    html += '<p>Open the file create dialog on GitHub: <a href="https://github.com/' + repoPath + '/new/main?filename=' + targetPath + '" target="_blank">Create/Update hunep_state.json in GitHub</a></p>';
+    html += '<p>Paste the JSON below into the file editor and commit.</p>';
+    html += '<pre>' + escapeHtml(content) + '</pre>';
+    html += '<p>After publishing, anyone visiting your page can load the shared state by clicking the <strong>Állapot betöltése</strong> button.</p>';
+    html += '</body></html>';
+    w.document.write(html);
+    w.document.close();
+}
+
+// Helper to escape content for a single-quoted shell echo (basic)
+function escapeForShell(s) {
+    return s.replace(/'/g, "'\\''");
+}
+
+// On load attempt to fetch hunep_state.json from the same GitHub Pages site
+(function tryLoadRemoteState() {
+    const remoteUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'hunep_state.json';
+    fetch(remoteUrl, { cache: 'no-store' }).then(r => {
+        if (!r.ok) throw new Error('no remote');
+        return r.json();
+    }).then(state => {
+        if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
+            projects = state.projects;
+            employees = state.employees;
+            document.addEventListener('DOMContentLoaded', () => { renderProjects(); renderEmployees(); });
+            console.log('Loaded remote state from', remoteUrl);
+        }
+    }).catch(() => {
+        // ignore if not present
+    });
+})();
     </script>
 </body>
 </html>
-
