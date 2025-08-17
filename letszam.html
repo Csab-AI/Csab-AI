@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hunep - Erőforrás Hozzárendelés</title>
+    <title>1Hunep - Erőforrás Hozzárendelés</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -417,16 +417,52 @@
         }
 
         /* GANTT diagram stílusok */
+
         .gantt-container {
-            overflow: auto;
+            overflow-x: auto; /* allow horizontal scrolling */
+            overflow-y: auto;
             margin-top: 20px;
             border: 1px solid #ddd;
             border-radius: 4px;
             background: white;
+            max-width: 100%;
         }
 
+        /* The chart inner area is wide (many weeks) and scrollable horizontally */
         .gantt-chart {
-            min-width: 1000px;
+            min-width: 800px;
+        }
+
+        .gantt-timeline-wrapper {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        .gantt-timeline-inner {
+            position: relative;
+            height: 80px; /* space for grid lines and labels */
+            min-width: 1000px; /* will be overridden inline by JS */
+        }
+
+        .gantt-timeline-band {
+            position: absolute;
+            top: 0;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #333;
+            border-right: 1px solid rgba(0,0,0,0.06);
+            background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent);
+        }
+
+        .gantt-timeline-gridline {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(0,0,0,0.06);
         }
 
         .gantt-header {
@@ -1127,38 +1163,117 @@
             }
 
             const container = document.getElementById('ganttContainer');
-            
-            // Projektek dátum szerint rendezése
-            const sortedProjects = [...projects].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+            container.innerHTML = '';
 
-            container.innerHTML = `
-                <div class="gantt-chart">
-                    <div class="gantt-header">
-                        <div class="gantt-header-cell">Projekt neve</div>
-                        <div class="gantt-header-cell">Időtartam és hozzárendelések</div>
-                    </div>
-                    ${sortedProjects.map(project => {
-                        const startDate = new Date(project.startDate);
-                        const endDate = new Date(project.endDate);
-                        const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-                        const assignmentText = project.assignments.length > 0 
-                            ? `(${project.assignments.length} dolgozó hozzárendelve)`
-                            : '(nincs hozzárendelés)';
-                        
-                        return `
-                            <div class="gantt-row">
-                                <div class="gantt-project-name">${escapeHtml(project.name)}</div>
-                                <div class="gantt-timeline">
-                                    <div class="gantt-bar">
-                                        ${project.startDate} - ${project.endDate} (${duration} nap) ${assignmentText}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
+            // Fixed timeline: 2025-09-01 .. 2026-12-31
+            const timelineStart = new Date('2025-09-01');
+            const timelineEnd = new Date('2026-12-31');
+            const msPerDay = 1000 * 60 * 60 * 24;
+            const totalDays = Math.ceil((timelineEnd - timelineStart) / msPerDay) + 1;
+
+            // Layout: pixels per day -> choose so two-week band is comfortable
+            const pixelsPerDay = 6; // 14 days -> 84px band width
+            const timelineWidth = totalDays * pixelsPerDay;
+
+            // Header + timeline wrapper
+            const chart = document.createElement('div');
+            chart.className = 'gantt-chart';
+
+            const header = document.createElement('div');
+            header.className = 'gantt-header';
+            header.innerHTML = `
+                <div class="gantt-header-cell">Projekt neve</div>
+                <div class="gantt-header-cell">Időtartam és hozzárendelések</div>
             `;
+            chart.appendChild(header);
 
+            // Timeline top area (bands and grid)
+            const timelineWrapper = document.createElement('div');
+            timelineWrapper.className = 'gantt-timeline-wrapper';
+            const timelineInner = document.createElement('div');
+            timelineInner.className = 'gantt-timeline-inner';
+            timelineInner.style.minWidth = timelineWidth + 'px';
+
+            // Render 14-day bands starting from timelineStart
+            let bandStart = new Date(timelineStart.getTime());
+            while (bandStart <= timelineEnd) {
+                const bandEnd = new Date(bandStart.getTime() + (14 * msPerDay) - msPerDay);
+                const left = Math.round((bandStart - timelineStart) / msPerDay) * pixelsPerDay;
+                const bandWidthDays = Math.min(Math.ceil((bandEnd - bandStart) / msPerDay) + 1, totalDays - Math.round((bandStart - timelineStart) / msPerDay));
+                const bandWidth = bandWidthDays * pixelsPerDay;
+
+                const band = document.createElement('div');
+                band.className = 'gantt-timeline-band';
+                band.style.left = left + 'px';
+                band.style.width = bandWidth + 'px';
+                band.textContent = `${bandStart.toLocaleDateString()} - ${Math.min(bandEnd, timelineEnd).toLocaleDateString()}`;
+                timelineInner.appendChild(band);
+
+                // vertical gridline at band start
+                const grid = document.createElement('div');
+                grid.className = 'gantt-timeline-gridline';
+                grid.style.left = left + 'px';
+                timelineInner.appendChild(grid);
+
+                bandStart.setDate(bandStart.getDate() + 14);
+            }
+
+            timelineWrapper.appendChild(timelineInner);
+            chart.appendChild(timelineWrapper);
+
+            // Projects rows
+            const sortedProjects = [...projects].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+            sortedProjects.forEach(project => {
+                const row = document.createElement('div');
+                row.className = 'gantt-row';
+
+                const nameCell = document.createElement('div');
+                nameCell.className = 'gantt-project-name';
+                nameCell.textContent = project.name;
+
+                const timelineCell = document.createElement('div');
+                timelineCell.className = 'gantt-timeline';
+                timelineCell.style.position = 'relative';
+                timelineCell.style.minWidth = timelineWidth + 'px';
+
+                // If project has valid dates, render bar with calculated position and width
+                if (project.startDate && project.endDate) {
+                    const start = new Date(project.startDate);
+                    const end = new Date(project.endDate);
+                    // clamp to timeline
+                    const clampedStart = start < timelineStart ? timelineStart : start;
+                    const clampedEnd = end > timelineEnd ? timelineEnd : end;
+                    const offsetDays = Math.round((clampedStart - timelineStart) / msPerDay);
+                    const durationDays = Math.max(1, Math.round((clampedEnd - clampedStart) / msPerDay) + 1);
+
+                    const bar = document.createElement('div');
+                    bar.className = 'gantt-bar';
+                    bar.style.position = 'absolute';
+                    bar.style.left = (offsetDays * pixelsPerDay) + 'px';
+                    bar.style.width = (durationDays * pixelsPerDay) + 'px';
+                    bar.style.top = '10px';
+                    bar.style.height = '30px';
+                    bar.textContent = `${project.startDate} – ${project.endDate}`;
+                    timelineCell.appendChild(bar);
+                } else {
+                    // no dates
+                    const noDate = document.createElement('div');
+                    noDate.className = 'gantt-bar';
+                    noDate.style.position = 'absolute';
+                    noDate.style.left = '0px';
+                    noDate.style.top = '10px';
+                    noDate.style.height = '30px';
+                    noDate.textContent = 'Nincs dátum';
+                    timelineCell.appendChild(noDate);
+                }
+
+                row.appendChild(nameCell);
+                row.appendChild(timelineCell);
+                chart.appendChild(row);
+            });
+
+            container.appendChild(chart);
+            // show modal
             document.getElementById('ganttModal').style.display = 'block';
         }
 
