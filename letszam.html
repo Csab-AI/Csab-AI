@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3Hunep - Erőforrás Hozzárendelés</title>
+    <title>4Hunep - Erőforrás Hozzárendelés</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -1387,6 +1387,121 @@ function formatDateNoTime(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}.${m}.${day}`;
+}
+
+// UI helper: show/hide main sections (projects / employees)
+function showTab(tab) {
+    const projectsEl = document.getElementById('projects-section');
+    const employeesEl = document.getElementById('employees-section');
+    const container = document.querySelector('.container');
+    if (!projectsEl || !employeesEl || !container) return;
+
+    if (tab === 'projects') {
+        // show both columns if space permits
+        projectsEl.style.display = '';
+        employeesEl.style.display = '';
+        container.style.gridTemplateColumns = '1fr 1fr';
+    } else if (tab === 'employees') {
+        // show only employees (single column)
+        projectsEl.style.display = 'none';
+        employeesEl.style.display = '';
+        container.style.gridTemplateColumns = '1fr';
+    } else {
+        // default: show both
+        projectsEl.style.display = '';
+        employeesEl.style.display = '';
+        container.style.gridTemplateColumns = '1fr 1fr';
+    }
+}
+
+// Save/Load application state to localStorage
+function saveState() {
+    try {
+        const state = { projects: projects, employees: employees };
+        localStorage.setItem('hunep_state_v1', JSON.stringify(state));
+        alert('Állapot elmentve a böngészőbe.');
+    } catch (e) {
+        console.error('saveState error', e);
+        alert('Hiba történt az állapot mentésekor.');
+    }
+}
+
+function loadState() {
+    try {
+        const raw = localStorage.getItem('hunep_state_v1');
+        if (!raw) {
+            alert('Nincs mentett állapot.');
+            return;
+        }
+        const state = JSON.parse(raw);
+        if (state && Array.isArray(state.projects) && Array.isArray(state.employees)) {
+            projects = state.projects;
+            employees = state.employees;
+            renderProjects();
+            renderEmployees();
+            alert('Állapot sikeresen betöltve.');
+        } else {
+            alert('Érvénytelen mentés formátum.');
+        }
+    } catch (e) {
+        console.error('loadState error', e);
+        alert('Hiba történt az állapot betöltésekor.');
+    }
+}
+
+// Simple comparison / summary view - opens a small popup with project summary
+function generateComparisonChart() {
+    try {
+        const popup = window.open('', '_blank', 'width=700,height=600,scrollbars=yes');
+        if (!popup) {
+            alert(`Összegzés: projektek: ${projects.length}`);
+            return;
+        }
+        let html = '<!doctype html><html><head><meta charset="utf-8"><title>Összehasonlító diagram</title>';
+        html += '<style>body{font-family:Arial;padding:12px}h2{color:#2e5bba}table{width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid #ddd;text-align:left}</style>';
+        html += '</head><body>';
+        html += `<h2>Projektek összegzése (${projects.length})</h2>`;
+        html += '<table><tr><th>Projekt</th><th>Időszak</th><th>Hozzárendelések</th></tr>';
+        projects.forEach(p => {
+            const name = p.name || '–';
+            const period = `${p.startDate || '–'} — ${p.endDate || '–'}`;
+            const assigns = Array.isArray(p.assignments) ? p.assignments.length : 0;
+            html += `<tr><td>${escapeHtml(name)}</td><td>${escapeHtml(period)}</td><td>${assigns}</td></tr>`;
+        });
+        html += '</table>';
+        html += '</body></html>';
+        popup.document.write(html);
+        popup.document.close();
+    } catch (e) {
+        console.error('generateComparisonChart error', e);
+        alert('Nem sikerült összehasonlítást készíteni.');
+    }
+}
+
+// PDF export using jsPDF (basic export of project list)
+function saveToPDF() {
+    try {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('jsPDF nem található. Ellenőrizze a betöltött könyvtárat.');
+            return;
+        }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        doc.setFontSize(14);
+        doc.text('Hunep - Projektek', 40, 50);
+        let y = 80;
+        projects.forEach(p => {
+            const line = `${p.name || ''} (${p.startDate || ''} - ${p.endDate || ''})`;
+            doc.setFontSize(11);
+            doc.text(line, 40, y);
+            y += 18;
+            if (y > 760) { doc.addPage(); y = 40; }
+        });
+        doc.save('hunep_projects.pdf');
+    } catch (e) {
+        console.error('saveToPDF error', e);
+        alert('PDF exportálás nem sikerült.');
+    }
 }
     </script>
 </body>
