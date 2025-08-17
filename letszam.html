@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>6Hunep - Erőforrás Hozzárendelés</title>
+  <title>Hunep - Erőforrás Hozzárendelés</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -145,6 +145,14 @@
     .gantt-row-content { position:absolute; left:210px; top:0; height:100%; overflow:visible; }
     .gantt-bar {
       position:absolute; height:28px; top:11px; background:#005baa; color:#fff; border-radius:4px; text-align:center; font-size:12px; line-height:28px; overflow:hidden; white-space:nowrap; padding:0 6px; box-shadow:0 2px 5px rgba(0,0,0,.2);
+    }
+    /* Piros marker 2026-01-01-re */
+    .gantt-marker {
+      position:absolute; top:0; bottom:0; width:2px; background:#ff2a2a; z-index:5;
+    }
+    .gantt-marker-label {
+      position:absolute; top:0; transform:translateX(-50%); font-size:11px; background:#fff; padding:2px 4px;
+      border:1px solid #ff2a2a; border-radius:3px; z-index:6; white-space:nowrap;
     }
 
     /* --------- Responsive --------- */
@@ -293,7 +301,8 @@
         { id:8, name:"Szabad kapacitás 2", startDate:"2026-04-01", endDate:"2026-12-31", assignments:[] },
         { id:9, name:"Szabad kapacitás 3", startDate:"2026-08-01", endDate:"2026-12-31", assignments:[] },
         { id:10, name:"BMW vagy bármi más egyéb kis, áthúzódó munka", startDate:"2025-10-01", endDate:"2026-05-31", assignments:[] },
-        { id:11, name:"Sátoraljaújhely szálloda", startDate:"2025-09-01", endDate:"2025-11-15", assignments:[] }
+        { id:11, name:"Sátoraljaújhely szálloda", startDate:"2025-09-01", endDate:"2025-11-15", assignments:[] },
+{ id:12, name:"NYIA áthúzódó elektromos munkák és projektzárás", startDate:"2025-09-01", endDate:"2026-03-31", assignments:[] }
       ];
     }
     if (employees.length === 0) {
@@ -612,8 +621,8 @@
     if (!ganttContainer) return;
 
     // Fix időtartam
-    const timelineStart = new Date(2025,8,1);
-    const timelineEnd   = new Date(2026,11,31);
+    const timelineStart = new Date(2025,8,1);   // 2025-09-01
+    const timelineEnd   = new Date(2026,11,31); // 2026-12-31
     const dayWidth = 6;
     const bandDays = 14;
     const labelLeftWidth = 210;
@@ -668,6 +677,7 @@
       return null;
     }
 
+    // PROJEKT SOROK
     projects.forEach((proj, idx) => {
       const row = document.createElement('div');
       row.className = 'gantt-row';
@@ -724,6 +734,24 @@
       inner.appendChild(row);
     });
 
+    // ---- Piros marker: 2026-01-01 ----
+    const markerDate = new Date(2026, 0, 1); // Jan=0
+    if (markerDate >= timelineStart && markerDate <= timelineEnd) {
+      const offsetDaysToMarker = Math.round((markerDate - timelineStart) / msPerDay);
+      const markerLeftPx = labelLeftWidth + offsetDaysToMarker * dayWidth;
+
+      const marker = document.createElement('div');
+      marker.className = 'gantt-marker';
+      marker.style.left = markerLeftPx + 'px';
+      inner.appendChild(marker);
+
+      const markerLabel = document.createElement('div');
+      markerLabel.className = 'gantt-marker-label';
+      markerLabel.style.left = markerLeftPx + 'px';
+      markerLabel.textContent = '2026-01-01';
+      inner.appendChild(markerLabel);
+    }
+
     scroll.appendChild(inner);
     ganttContainer.appendChild(scroll);
 
@@ -752,28 +780,94 @@
     }
   }
 
-  // ---- Kapacitás áttekintés ----
+  // ---- Kapacitás áttekintés (HAVI bontás 2025-10-01-től) ----
   function showCapacityOverview() {
-    // egyszerű popup táblázat: név, szerep, össz. %
-    const rows = employees.map(emp => {
-      const total = projects.reduce((acc,p)=>{
-        const a = (p.assignments||[]).find(x=>x.id===emp.id);
-        return acc + (a ? a.perc : 0);
-      }, 0);
-      return { name: emp.name, role: emp.role, total };
-    }).sort((a,b)=> b.total - a.total || a.name.localeCompare(b.name,'hu'));
+    // Időablak: 2025-10-01 -> a projektek max. végdátuma (legalább 2026-12-31)
+    const startFrom = new Date(2025, 9, 1);  // 2025-10-01
+    const projectsMaxEnd = projects.reduce((max, p) => {
+      const d = p.endDate ? new Date(p.endDate) : null;
+      return d && !isNaN(d) && d > max ? d : max;
+    }, new Date(2026, 11, 31));              // fallback: 2026-12-31
+    const endTo = projectsMaxEnd;
 
-    const popup = window.open('', '_blank', 'width=800,height=700,scrollbars=yes');
-    if (!popup) { alert('Nem sikerült megnyitni az áttekintőt.'); return; }
-    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Kapacitás áttekintés</title>';
-    html += '<style>body{font-family:Arial;padding:14px}h2{color:#2e5bba}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd;text-align:left}thead{background:#f7f9fc}</style>';
-    html += '</head><body>';
-    html += `<h2>Kapacitás áttekintés (${rows.length} fő)</h2>`;
-    html += '<table><thead><tr><th>Név</th><th>Szerep</th><th>Összes kapacitás (%)</th></tr></thead><tbody>';
-    rows.forEach(r=>{
-      html += `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.role)}</td><td>${r.total}</td></tr>`;
+    const months = [];
+    // generáljuk a hónapokat [startOfMonth, endOfMonth]
+    let y = startFrom.getFullYear(), m = startFrom.getMonth();
+    while (true) {
+      const monthStart = new Date(y, m, 1);
+      const monthEnd = new Date(y, m + 1, 0); // hónap utolsó napja
+      if (monthStart > endTo) break;
+      months.push({ start: monthStart, end: monthEnd, label: `${monthStart.getFullYear()}-${String(monthStart.getMonth()+1).padStart(2,'0')}` });
+      // következő hónap
+      m += 1; if (m > 11) { m = 0; y += 1; }
+      if (monthStart.getFullYear() === endTo.getFullYear() && monthStart.getMonth() === endTo.getMonth()) break;
+    }
+
+    // nap alapú súlyozás
+    const msPerDay = 1000*60*60*24;
+    function daysDiffInclusive(a,b){ return Math.max(0, Math.floor((b - a)/msPerDay) + 1); }
+    function clamp(d, a, b){ return d < a ? a : (d > b ? b : d); }
+
+    // Minden dolgozóhoz, minden hónap %-a
+    const rows = employees.map(emp => {
+      const monthPerc = months.map(({start, end}) => {
+        const daysInMonth = daysDiffInclusive(start, end);
+        // összegezzük az összes projekt-hozzárendelést
+        let totalPct = 0;
+        projects.forEach(p => {
+          if (!Array.isArray(p.assignments) || !p.startDate || !p.endDate) return;
+          const asg = p.assignments.find(a => a.id === emp.id);
+          if (!asg) return;
+          const pStart = new Date(p.startDate);
+          const pEnd = new Date(p.endDate);
+          if (isNaN(pStart) || isNaN(pEnd)) return;
+
+          // átfedő napok a hónappal
+          const overlapStart = clamp(pStart, start, end);
+          const overlapEnd   = clamp(pEnd, start, end);
+          const overlapDays  = (overlapEnd >= overlapStart) ? daysDiffInclusive(overlapStart, overlapEnd) : 0;
+          if (overlapDays > 0) {
+            // napi állandó % feltételezés -> havi átlag = perc * (átfedés napjai / hónap napjai)
+            totalPct += asg.perc * (overlapDays / daysInMonth);
+          }
+        });
+        // kerekítsünk 1 tizedesre
+        return Math.round(totalPct * 10) / 10;
+      });
+      return { name: emp.name, role: emp.role, perMonth: monthPerc };
     });
-    html += '</tbody></table></body></html>';
+
+    // popup táblázat felépítése
+    const popup = window.open('', '_blank', 'width=1100,height=800,scrollbars=yes');
+    if (!popup) { alert('Nem sikerült megnyitni a kapacitás áttekintést.'); return; }
+    let html = '<!doctype html><html><head><meta charset="utf-8"><title>Kapacitás áttekintés (havi)</title>';
+    html += '<style>';
+    html += 'body{font-family:Arial;padding:14px}';
+    html += 'h2{color:#2e5bba;margin-bottom:10px}';
+    html += 'table{width:100%;border-collapse:collapse;table-layout:fixed}';
+    html += 'th,td{border:1px solid #ddd;padding:6px; font-size:12px; text-align:right}';
+    html += 'th.sticky{position:sticky; top:0; background:#f7f9fc; z-index:2}';
+    html += 'td.name, th.name{position:sticky; left:0; text-align:left; background:#fff; z-index:1; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}';
+    html += 'td.role, th.role{position:sticky; left:220px; text-align:left; background:#fff; z-index:1; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}';
+    html += '.over{background:#ffe5e5}';
+    html += '</style></head><body>';
+    html += `<h2>Kapacitás áttekintés (havi) — kezdő: 2025-10-01</h2>`;
+    html += '<div style="overflow:auto; max-height:700px;">';
+    html += '<table><thead><tr>';
+    html += '<th class="name sticky">Név</th><th class="role sticky">Szerep</th>';
+    months.forEach(m => { html += `<th class="sticky">${m.label}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    rows.forEach(r => {
+      html += `<tr><td class="name">${escapeHtml(r.name)}</td><td class="role">${escapeHtml(r.role)}</td>`;
+      r.perMonth.forEach(v => {
+        const over = v > 100 ? ' over' : '';
+        html += `<td class="${over}">${v.toFixed(1)}%</td>`;
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div></body></html>';
     popup.document.write(html); popup.document.close();
   }
 
