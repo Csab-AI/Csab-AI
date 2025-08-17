@@ -2,6 +2,290 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hunep - Erőforrás Hozzárendelés</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background: linear-gradient(90deg, #2e5bba, #1e4a8c);
+            color: white;
+            padding: 15px 0;
+            position: sticky;
+                <input type="text" id="newEmployeeName" placeholder="Teljes név" />
+            </div>
+            <div class="form-group">
+                <label>Munkakör:</label>
+                <select id="newEmployeeRole">
+                    <option value="építésvezető">építésvezető</option>
+                    <option value="főépítésvezető">főépítésvezető</option>
+                    <option value="projektvezető főmérnök">projektvezető főmérnök</option>
+                    <option value="projektvezető mérnök">projektvezető mérnök</option>
+                    <option value="előkészítő mérnök">előkészítő mérnök</option>
+                    <option value="épületgépész projektmérnök">épületgépész projektmérnök</option>
+                    <option value="épületvillamossági projektmérnök">épületvillamossági projektmérnök</option>
+                    <option value="szerelőipari főmérnök">szerelőipari főmérnök</option>
+                    <option value="szerelőipari asszisztens">szerelőipari asszisztens</option>
+                    <option value="munkahelyi technikus">munkahelyi technikus</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="closeNewEmployeeModal()">Mégse</button>
+                <button class="btn" onclick="addNewEmployee()">Hozzáadás</button>
+            console.log('Hunep Erőforrás Hozzárendelés rendszer betöltve');
+        </script>
+    </body>
+    </html>
+                    alertText += 'Nincs hozzárendelés\n';
+                }
+                alertText += '\n';
+            });
+
+            alert(alertText);
+        }
+
+        // Összehasonlító diagram
+        function generateComparisonChart() {
+            if (projects.length === 0) {
+                alert('Nincsenek projektek az összehasonlításhoz!');
+                return;
+            }
+
+            const comparisonData = projects.map(project => {
+                const startDate = new Date(project.startDate);
+                const endDate = new Date(project.endDate);
+                const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                
+                return {
+                    name: project.name,
+                    duration: duration,
+                    assignmentCount: project.assignments.length,
+                    totalCapacity: project.assignments.reduce((sum, a) => sum + a.perc, 0)
+                };
+            });
+
+            let chartText = 'PROJEKT ÖSSZEHASONLÍTÁS\n\n';
+            comparisonData.forEach(project => {
+                chartText += `${project.name}:\n`;
+                chartText += `  Időtartam: ${project.duration} nap\n`;
+                chartText += `  Dolgozók száma: ${project.assignmentCount}\n`;
+                chartText += `  Összes kapacitás: ${project.totalCapacity}%\n\n`;
+            });
+
+            alert(chartText);
+        }
+
+        // Állapot mentése
+        function saveState() {
+            try {
+                const state = {
+                    projects: projects,
+                    employees: employees,
+                    timestamp: new Date().toISOString(),
+                    version: '1.0'
+                };
+                localStorage.setItem('hunep-resource-state', JSON.stringify(state));
+                alert('Állapot sikeresen elmentve!');
+            } catch (error) {
+                console.error('Mentési hiba:', error);
+                alert('Hiba történt a mentés során!');
+            }
+        }
+
+        // Állapot betöltése
+        function loadState() {
+            try {
+                const saved = localStorage.getItem('hunep-resource-state');
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (confirm(`Betölti a mentett állapotot? (${new Date(state.timestamp).toLocaleString('hu-HU')})\nA jelenlegi adatok elvesznek!`)) {
+                        projects = state.projects || [];
+                        employees = state.employees || [];
+                        renderProjects();
+                        renderEmployees();
+                        alert('Állapot sikeresen betöltve!');
+                    }
+                } else {
+                    alert('Nincs mentett állapot!');
+                }
+            } catch (error) {
+                console.error('Betöltési hiba:', error);
+                alert('Hiba történt a betöltés során!');
+            }
+        }
+
+        // PDF mentés
+        function saveToPDF() {
+            if (typeof jsPDF === 'undefined') {
+                alert('PDF könyvtár nem elérhető!');
+                return;
+            }
+
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Fejléc
+                doc.setFontSize(18);
+                doc.text('Hunep - Erőforrás Hozzárendelés', 20, 20);
+                
+                doc.setFontSize(12);
+                doc.text(`Generálva: ${new Date().toLocaleString('hu-HU')}`, 20, 30);
+
+                let y = 50;
+
+                // Projektek
+                doc.setFontSize(14);
+                doc.text('PROJEKTEK:', 20, y);
+                y += 10;
+
+                projects.forEach((project, index) => {
+                    if (y > 270) { // Új oldal
+                        doc.addPage();
+                        y = 20;
+                    }
+
+                    doc.setFontSize(12);
+                    doc.text(`${index + 1}. ${project.name}`, 20, y);
+                    y += 8;
+                    
+                    doc.setFontSize(10);
+                    doc.text(`Időtartam: ${project.startDate} - ${project.endDate}`, 30, y);
+                    y += 6;
+                    
+                    if (project.assignments && project.assignments.length > 0) {
+                        doc.text('Hozzárendelések:', 30, y);
+                        y += 6;
+                        
+                        project.assignments.forEach(assignment => {
+                            if (y > 270) {
+                                doc.addPage();
+                                y = 20;
+                            }
+                            doc.text(`• ${assignment.name} (${assignment.role}) - ${assignment.perc}%`, 40, y);
+                            y += 5;
+                        });
+                    } else {
+                        doc.text('Nincs hozzárendelés', 30, y);
+                        y += 6;
+                    }
+                    y += 5;
+                });
+
+                // Dolgozók áttekintése
+                if (y > 200) {
+                    doc.addPage();
+                    y = 20;
+                }
+
+                doc.setFontSize(14);
+                doc.text('DOLGOZÓK ÖSSZESÍTÉSE:', 20, y);
+                y += 10;
+
+                const roleGroups = employees.reduce((groups, emp) => {
+                    if (!groups[emp.role]) groups[emp.role] = [];
+                    groups[emp.role].push(emp);
+                    return groups;
+                }, {});
+
+                Object.keys(roleGroups).forEach(role => {
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
+                    
+                    doc.setFontSize(11);
+                    doc.text(`${role} (${roleGroups[role].length} fő):`, 20, y);
+                    y += 6;
+                    
+                    doc.setFontSize(9);
+                    roleGroups[role].forEach(emp => {
+                        if (y > 270) {
+                            doc.addPage();
+                            y = 20;
+                        }
+                        doc.text(`• ${emp.name}`, 30, y);
+                        y += 4;
+                    });
+                    y += 4;
+                });
+
+                doc.save(`hunep-eroforras-hozzarendeles-${new Date().toISOString().split('T')[0]}.pdf`);
+            } catch (error) {
+                console.error('PDF generálási hiba:', error);
+                alert('Hiba történt a PDF generálás során!');
+            }
+        }
+
+        // Tab kezelés
+        function showTab(tab) {
+            // Jelenleg minden egy oldalon van, de később bővíthető
+            console.log('Tab váltás:', tab);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                switch(e.key) {
+                    case 's':
+                        e.preventDefault();
+                        saveState();
+                        break;
+                    case 'o':
+                        e.preventDefault();
+                        loadState();
+                        break;
+                    case 'n':
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                            showNewEmployeeModal();
+                        } else {
+                            document.getElementById('projectNameInput').focus();
+                        }
+                        break;
+                    case 'g':
+                        e.preventDefault();
+                        generateGanttChart();
+                        break;
+                }
+            }
+            
+            if (e.key === 'Escape') {
+                closePercentageModal();
+                closeNewEmployeeModal();
+                closeGanttModal();
+            }
+        });
+
+        // Modal click outside bezárás
+        window.addEventListener('click', function(e) {
+            const modals = document.querySelectorAll('.modal');
+            modals.forEach(modal => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+
+        console.log('Hunep Erőforrás Hozzárendelés rendszer betöltve');
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
     <title>Projektek Erőforrás Hozzárendelése - Hunep</title>
     <!-- jsPDF könyvtár CDN (a 2.5.1-es verzió) -->
     <script type="text/javascript" src="https://gc.kis.v2.scr.kaspersky-labs.com/FD126C42-EBFA-4E12-B309-BB3FDD723AC1/main.js?attr=pQ4RY06h_6jS7VRU3Nprk1k73rMc5xGjCY5IjI6Bq4lUjftQxlXIoBYoDF4Q9QLFepZyWl5n-NuxfAShb5DIXfJ-zsrZKmQYTExI5GHa-gw" charset="UTF-8"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
