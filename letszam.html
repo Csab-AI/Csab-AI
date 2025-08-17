@@ -73,6 +73,19 @@
     .gantt-marker{position:absolute;top:0;bottom:0;width:2px;background:#ff2a2a;z-index:5}
     .gantt-marker-label{position:absolute;top:0;transform:translateX(-50%);font-size:11px;background:#fff;padding:2px 4px;border:1px solid #ff2a2a;border-radius:3px;z-index:6;white-space:nowrap}
 
+    /* Interaktív Gantt kiegészítések */
+    .gantt-tooltip{
+      position:fixed; pointer-events:none; background:rgba(0,0,0,.85); color:#fff;
+      padding:8px 10px; border-radius:6px; font-size:12px; line-height:1.35;
+      z-index:10000; max-width:360px; white-space:pre-wrap; display:none;
+    }
+    .gantt-livebar{
+      position:sticky; bottom:0; background:#0b1320; color:#fff;
+      padding:8px 12px; font-size:12px; display:flex; gap:16px; align-items:flex-start; border-top:1px solid #223;
+    }
+    .gantt-livebar strong{color:#6cf}
+    .gantt-livebar ul{margin:0; padding-left:18px; font-size:12px; max-height:120px; overflow:auto}
+
     /* Kapacitás tábla popup */
     .cap-table-wrap{overflow:auto;max-height:700px}
     table.cap{width:100%;border-collapse:collapse;table-layout:fixed}
@@ -95,14 +108,12 @@
     <nav>
       <button onclick="showTab('projects')">Projektek & Dolgozók</button>
       <button onclick="generateGanttChart()">GANTT diagram</button>
-     
       <button onclick="generateComparisonChart()">Összehasonlító diagram</button>
       <button onclick="showCapacityOverview()">Kapacitás áttekintés</button>
       <button onclick="saveState()">Állapot mentése</button>
       <button onclick="loadState()">Állapot betöltése</button>
       <button onclick="exportStateToFile()">Exportálás (.json)</button>
       <button onclick="triggerImportFile()">Importálás (.json)</button>
-     
     </nav>
   </div>
 </header>
@@ -251,13 +262,13 @@
         { id:33, name:"Szombathy Szabolcs", role:"főépítésvezető" }
       ];
     }
-    // régi mentésből jövő assignments igazítása név->id
+    // assignments igazítása név->id
     projects.forEach(p=>{
       if (!Array.isArray(p.assignments)) return;
       p.assignments = p.assignments.map(a=>{
         const m = employees.find(e=>e.name===a.name);
         return m? {...a, id:m.id, role:m.role} : a;
-        });
+      });
     });
   }
 
@@ -393,18 +404,24 @@
       let s=parseDate(proj.startDate), e=parseDate(proj.endDate); if(s&&e&&s>e){const t=s;s=e;e=t}
       if(s&&e){
         if(e < timelineStart || s > timelineEnd){
-          const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='100px'; bar.style.background='#999'; bar.textContent='Kívül esik'; content.appendChild(bar);
+          const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='100px'; bar.style.background='#999'; bar.textContent=proj.name+' (kívül)'; content.appendChild(bar);
         } else {
           const cs = s<timelineStart? timelineStart : s;
           const ce = e>timelineEnd  ? timelineEnd   : e;
           const off = Math.round((cs - timelineStart)/msPerDay);
           const dur = Math.max(1, Math.ceil((ce - cs)/msPerDay)+1);
           const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left=(off*dayWidth)+'px'; bar.style.width=(Math.max(6,dur*dayWidth))+'px';
-          bar.textContent = `${formatDate(cs)} – ${formatDate(ce)}`;
+          // sávon mindig a projekt neve látszik
+          bar.textContent = proj.name;
+          // részletes title és tooltiphez adat
+          const asgText = (proj.assignments||[]).map(a=>`${a.name} — ${a.perc}%`).join(', ');
+          bar.title = `${proj.name}\n${formatDate(cs)} – ${formatDate(ce)}${asgText?`\n${asgText}`:''}`;
+          // hozzárendeljük a név alapján a tooltiphez
+          bar.dataset.projectName = proj.name;
           content.appendChild(bar);
         }
       } else {
-        const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='120px'; bar.style.background='#e0a800'; bar.textContent='Nincs dátum'; content.appendChild(bar);
+        const bar=document.createElement('div'); bar.className='gantt-bar'; bar.style.left='0px'; bar.style.width='120px'; bar.style.background='#e0a800'; bar.textContent=proj.name+' (nincs dátum)'; content.appendChild(bar);
       }
 
       row.appendChild(content); inner.appendChild(row);
@@ -420,6 +437,8 @@
     }
 
     scroll.appendChild(inner); wrap.appendChild(scroll);
+    // interaktivitás + alsó élő sáv
+    addGanttInteractivity({container:wrap, inner, labelLeftWidth, dayWidth, timelineStart, timelineEnd});
     document.getElementById('ganttModal').style.display='block';
   }
   function formatDate(d){return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
@@ -435,6 +454,83 @@
       document.exitFullscreen?.();
       btn.textContent = 'Teljes képernyő';
     }
+  }
+
+  // --- GANTT interaktivitás: tooltip + alsó élő sáv (futó projektek listája is) ---
+  function addGanttInteractivity({ container, inner, labelLeftWidth, dayWidth, timelineStart, timelineEnd }){
+    let tip = document.querySelector('.gantt-tooltip');
+    if (!tip){
+      tip = document.createElement('div');
+      tip.className = 'gantt-tooltip';
+      document.body.appendChild(tip);
+    }
+
+    let live = container.querySelector('.gantt-livebar');
+    if(!live){
+      live = document.createElement('div');
+      live.className = 'gantt-livebar';
+      live.innerHTML = `
+        <div><strong>Dátum:</strong> <span id="live-date">—</span></div>
+        <div><strong>Futó projektek:</strong> <span id="live-count">0</span></div>
+        <div><strong>Lista:</strong><ul id="live-list"></ul></div>
+      `;
+      container.appendChild(live);
+    }
+    const liveDate = live.querySelector('#live-date');
+    const liveCount = live.querySelector('#live-count');
+    const liveList = live.querySelector('#live-list');
+
+    // Tooltip: sor / sáv fölött a dolgozók neve és %
+    inner.querySelectorAll('.gantt-row').forEach(row=>{
+      row.addEventListener('mouseenter',()=>{
+        const nameEl = row.querySelector('.gantt-label');
+        const proj = projects.find(p => (p.name||'').trim() === (nameEl?.textContent||'').trim());
+        let txt = `📌 ${proj?.name||'Projekt'}\n`;
+        if (proj && Array.isArray(proj.assignments) && proj.assignments.length){
+          txt += proj.assignments.map(a=>`• ${a.name} — ${a.perc}%`).join('\n');
+        } else {
+          txt += 'Nincs hozzárendelés';
+        }
+        tip.textContent = txt;
+        tip.style.display = 'block';
+      });
+      row.addEventListener('mouseleave',()=>{ tip.style.display='none'; });
+      row.addEventListener('mousemove',ev=>{
+        tip.style.left = (ev.clientX + 14) + 'px';
+        tip.style.top  = (ev.clientY + 14) + 'px';
+      });
+    });
+
+    // Egérpozíció -> dátum -> futó projektek darabszám és lista
+    inner.addEventListener('mousemove', ev=>{
+      const rect = inner.getBoundingClientRect();
+      const sc = container.querySelector('.gantt-scroll');
+      const x = (ev.clientX - rect.left) + (sc ? sc.scrollLeft : 0);
+      const xTimeline = Math.max(0, x - labelLeftWidth);
+      const daysFromStart = Math.round(xTimeline / dayWidth);
+      const cur = new Date(timelineStart.getTime() + daysFromStart*24*60*60*1000);
+
+      if (cur < timelineStart || cur > timelineEnd){
+        liveDate.textContent = '—';
+        liveCount.textContent = '0';
+        liveList.innerHTML = '';
+        return;
+      }
+
+      const running = projects.filter(p=>{
+        if (!p.startDate || !p.endDate) return false;
+        const s = new Date(p.startDate), e = new Date(p.endDate);
+        if (isNaN(s) || isNaN(e)) return false;
+        return s <= cur && cur <= e; // inkluzív
+      });
+
+      liveDate.textContent = cur.toISOString().slice(0,10);
+      liveCount.textContent = String(running.length);
+      liveList.innerHTML = running.map(r=>`<li>${escapeHtml(r.name)}</li>`).join('');
+    });
+    inner.addEventListener('mouseleave', ()=>{
+      liveDate.textContent='—'; liveCount.textContent='0'; liveList.innerHTML='';
+    });
   }
 
   // ---- UI helper ----
@@ -462,8 +558,6 @@
 
     const DAY=86400000;
     const daysInclusive=(a,b)=> Math.max(0, Math.floor((b-a)/DAY)+1);
-
-    // pontos átfedés: ha nincs metszet, 0 nap!
     function overlapDays(pStart,pEnd, mStart,mEnd){
       if (pEnd < mStart || pStart > mEnd) return 0;
       const s = pStart > mStart ? pStart : mStart;
@@ -491,11 +585,11 @@
     const win=window.open('', '_blank', 'width=1200,height=800,scrollbars=yes');
     if(!win){ alert('Nem sikerült megnyitni a kapacitás áttekintést.'); return; }
     let html='<!doctype html><html><head><meta charset="utf-8"><title>Kapacitás áttekintés (havi)</title>';
-    html+='<style>body{font-family:Arial;padding:14px}h2{color:#2e5bba;margin-bottom:10px}</style></head><body>';
+    html+='<style>body{font-family:Arial;padding:14px}h2{color:#2e5bba;margin-bottom:10px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px;font-size:12px}th{text-align:center}td{text-align:right}.name, .role{text-align:left}.over{background:#ffe5e5}</style></head><body>';
     html+=`<h2>Kapacitás áttekintés (havi) — kezdő: 2025-10-01</h2>`;
     html+='<div class="cap-table-wrap"><table class="cap"><thead><tr>';
-    html+='<th class="name sticky">Név</th><th class="role sticky">Szerep</th>';
-    months.forEach(m=> html+=`<th class="sticky">${m.label}</th>`);
+    html+='<th class="name">Név</th><th class="role">Szerep</th>';
+    months.forEach(m=> html+=`<th>${m.label}</th>`);
     html+='</tr></thead><tbody>';
     rows.forEach(r=>{
       html+=`<tr><td class="name">${escapeHtml(r.name)}</td><td class="role">${escapeHtml(r.role)}</td>`;
@@ -526,5 +620,3 @@
 </script>
 </body>
 </html>
-
-
