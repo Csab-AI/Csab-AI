@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF Compare Pro — Darabos Csaba</title>
+<title>PDF Compare - Darabos Csaba</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
   :root{
@@ -204,7 +204,10 @@
 
     <div class="priv"><span>🔒</span><span><strong>A PDF-ek nem hagyják el a gépedet.</strong> Minden feldolgozás a böngészőben történik. Semmilyen adat nem kerül szerverre.<br>💡 <strong>Tipp:</strong> A mellékelt <code>start_server.bat</code> indítja a lokális szervert — így a PDF renderelés külön szálon fut és az UI sosem fagy le.</span></div>
   </div>
-  <div class="modal-ft"><button class="go-btn" id="htGo">Értem, kezdjük!</button></div>
+  <div class="modal-ft">
+    <button class="go-btn" id="htGo">Értem, kezdjük!</button>
+    <p style="margin-top:12px;font-size:10px;color:var(--tx2);">Készítette: <a href="https://www.linkedin.com/in/darabos-csaba" target="_blank" rel="noopener" style="color:var(--ac);text-decoration:none;font-weight:600;">Darabos Csaba</a></p>
+  </div>
 </div>
 </div>
 
@@ -222,6 +225,7 @@
   <span id="sZ"></span>
   <span id="sP"></span>
   <span class="h" id="sH">Görgő: zoom · Húzás: pan · Nyilak: lapozás</span>
+  <span style="margin-left:8px;border-left:1px solid var(--brd);padding-left:8px;font-family:'DM Sans',sans-serif;font-size:9px;"><a href="https://www.linkedin.com/in/darabos-csaba" target="_blank" rel="noopener" style="color:var(--ac);text-decoration:none;display:flex;align-items:center;gap:4px;transition:color .15s;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='var(--ac)'"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>Készítette: Darabos Csaba</a></span>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
