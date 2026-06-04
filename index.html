@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF Compare Pro 12— Darabos Csaba</title>
+<title>PDF Compare Pro — Darabos Csaba</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
   :root{
@@ -15,24 +15,28 @@
   body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
 
   /* ── Top bar ── */
-  .top{display:flex;align-items:center;gap:5px;padding:0 10px;height:38px;background:var(--s1);border-bottom:1px solid var(--brd);flex-shrink:0;}
-  .logo{font-size:12px;font-weight:700;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:6px;white-space:nowrap;}
-  .sep{width:1px;height:18px;background:var(--brd);margin:0 3px;}
-  .b{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;padding:3px 9px;border:1px solid var(--brd);border-radius:4px;background:var(--s2);color:var(--tx2);cursor:pointer;white-space:nowrap;transition:all .1s;display:flex;align-items:center;gap:3px;}
+  .top{display:flex;align-items:center;gap:6px;padding:0 14px;height:46px;background:var(--s1);border-bottom:1px solid var(--brd);flex-shrink:0;}
+  .logo{font-size:14px;font-weight:700;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:8px;white-space:nowrap;}
+  .sep{width:1px;height:22px;background:var(--brd);margin:0 4px;}
+  .b{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:6px 12px;border:1px solid var(--brd);border-radius:5px;background:var(--s2);color:var(--tx2);cursor:pointer;white-space:nowrap;transition:all .1s;display:flex;align-items:center;gap:4px;}
   .b:hover{border-color:var(--ac);color:var(--tx);background:var(--s3);}
   .b.on{background:var(--ac);color:#fff;border-color:var(--ac);}
   .b.grn{border-color:var(--grn);color:var(--grn);}
   .b:disabled{opacity:.25;pointer-events:none;}
-  .bg{display:flex;gap:1px;background:var(--brd);border-radius:4px;overflow:hidden;}
+  .bg{display:flex;gap:1px;background:var(--brd);border-radius:5px;overflow:hidden;}
   .bg .b{border:none;border-radius:0;}
-  .rw{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--tx2);}
-  .rw input[type=range]{width:65px;accent-color:var(--ac);}
-  .rv{font-family:'JetBrains Mono',monospace;font-size:9px;min-width:24px;text-align:right;color:var(--tx);}
-  .pn{display:flex;align-items:center;gap:3px;margin-left:auto;}
-  .zi{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--tx2);min-width:32px;text-align:center;}
-  input[type=color]{width:20px;height:20px;border:1px solid var(--brd);border-radius:3px;background:none;cursor:pointer;padding:0;}
+  .rw{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx2);}
+  .rw input[type=range]{width:70px;accent-color:var(--ac);}
+  .rv{font-family:'JetBrains Mono',monospace;font-size:10px;min-width:26px;text-align:right;color:var(--tx);}
+  .pn{display:flex;align-items:center;gap:4px;margin-left:auto;}
+  .zi{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--tx2);min-width:36px;text-align:center;}
+  input[type=color]{width:24px;height:24px;border:1px solid var(--brd);border-radius:4px;background:none;cursor:pointer;padding:0;}
   input[type=color]::-webkit-color-swatch-wrapper{padding:1px;}
-  input[type=color]::-webkit-color-swatch{border:none;border-radius:2px;}
+  input[type=color]::-webkit-color-swatch{border:none;border-radius:3px;}
+  /* Prominent align button */
+  .b.align-btn{font-weight:700;font-size:12px;padding:6px 16px;border:2px solid var(--ac2);color:var(--ac2);background:rgba(124,91,245,.12);letter-spacing:.3px;}
+  .b.align-btn:hover{background:rgba(124,91,245,.25);border-color:var(--ac2);color:#fff;}
+  .b.align-btn.grn{border-color:var(--grn);color:var(--grn);background:rgba(61,220,132,.1);}
 
   /* ── Align bar ── */
   .abar{display:none;align-items:center;gap:8px;padding:5px 10px;background:linear-gradient(90deg,rgba(124,91,245,.08),rgba(78,136,255,.04));border-bottom:2px solid var(--ac2);flex-shrink:0;font-size:10px;}
@@ -105,9 +109,6 @@
   .go-btn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:8px 24px;border:none;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;box-shadow:0 3px 12px rgba(78,136,255,.3);}
   .go-btn:hover{filter:brightness(1.1);}
 
-  /* Diff overlay layer */
-  .diff-ovl{position:absolute;top:0;left:0;pointer-events:none;z-index:12;opacity:.85;}
-  .diff-ovl canvas{display:block;}
 </style>
 </head>
 <body>
@@ -126,8 +127,7 @@
   <button class="b" id="blkB" title="Villogtatás">👁 Blink</button>
   <div class="rw" id="thrC" style="display:none">Érzékenység<input type="range" id="thrS" min="1" max="80" value="20"><span class="rv" id="thrV">20</span></div>
   <div class="sep"></div>
-  <button class="b" id="alB">⊞ Illesztés</button>
-  <button class="b" id="diffB" title="Pixel diff az aktuális renderelési élességen" style="border-color:var(--cyn);color:var(--cyn);">🔍 Diff</button>
+  <button class="b align-btn" id="alB">⊞ Illesztés</button>
   <div class="sep"></div>
   <div class="bg" id="dGrp">
     <button class="b" data-d="line" title="Vonal">╱</button>
@@ -189,11 +189,6 @@
       <p>Ha a két PDF <strong>eltérő koordinátarendszerben</strong> lett mentve (más origó, más papírméret, más léptékű plot): az <strong>⊞ Illesztés</strong> gombbal kézzel ráhúzhatod a B réteget az A-ra. A narancs szaggatott keretű B réteget <strong>egérrel húzod</strong>, <span class="kbd">nyilakkal</span> finomhangolod (1px lépés), <span class="kbd">Shift+nyíl</span> = 10px. Az „Összes oldalra" gomb a beállítást minden oldalra alkalmazza. <strong>Enter</strong> vagy <strong>✓ Kész</strong> = visszalépés a normál nézetbe.</p>
     </div></div>
 
-    <div class="step"><div class="sn">🔍</div><div class="sc">
-      <h3>Diff — pixel-alapú eltéréskeresés</h3>
-      <p>A <strong>🔍 Diff</strong> gomb egy piros átfedést rajzol a jelenlegi nézetre, ami mutatja a pixeleltéréseket. A kulcs: <strong>minél jobban belenagyítottál, annál pontosabb</strong> — mert a PDF vektoros renderelése annál élesebb. Tipp: nagyíts rá egy gyanús területre, majd nyomd meg a Diff-et. Újra megnyomva kikapcsol.</p>
-    </div></div>
-
     <div class="step"><div class="sn">✏</div><div class="sc">
       <h3>Rajzeszközök és export</h3>
       <p><strong>Vonal, téglalap, kör, nyíl, szöveg</strong> — jelöld meg az eltéréseket kézzel, kommentekkel. Szín választható. <strong>↩</strong> = visszavonás, <strong>✕</strong> = minden rajz törlése. A <strong>💾 Export</strong> gomb PNG-t generál az aktuális nézetből a rajzokkal együtt.</p>
@@ -202,8 +197,7 @@
     <div class="step"><div class="sn">💡</div><div class="sc">
       <h3>Tippek haladóknak</h3>
       <p>• A <strong>Blink mód</strong> a leggyorsabb módszer apró szöveg- és méreteltérések felisméréhez — az emberi szem kiválóan észleli a villogó különbségeket.<br>
-      • Építészeti rajzoknál először <strong>illeszd össze</strong> a két PDF-et, aztán <strong>Blink</strong>-kel nézd át oldalanként.<br>
-      • A <strong>Diff</strong> a jelenleg renderelt élességen dolgozik — 300%-os zoomban sokkal pontosabb mint 50%-oson.<br>
+      • Építészeti rajzoknál először <strong>illeszd össze</strong> a két PDF-et (⊞ Illesztés), aztán <strong>Blink</strong>-kel nézd át oldalanként.<br>
       • A <strong>Hőtérkép</strong> mód hasznos a nagy eltérések gyors megtalálásához, a <strong>Blink</strong> az apróságokhoz.<br>
       • A <span class="kbd">Space</span> billentyű nyomva tartásával rajzolás módban is tudsz pan-elni.</p>
     </div></div>
@@ -657,65 +651,6 @@ $('htX').addEventListener('click',()=>htModal.classList.add('hide'));
 $('htGo').addEventListener('click',()=>htModal.classList.add('hide'));
 htModal.addEventListener('click',e=>{if(e.target===htModal)htModal.classList.add('hide');});
 $('helpB').addEventListener('click',()=>htModal.classList.remove('hide'));
-
-// ═══ DIFF OVERLAY ═══
-let diffOn=false;
-$('diffB').addEventListener('click',()=>{
-  if(!cA||!cB){return;}
-  diffOn=!diffOn;
-  $('diffB').classList.toggle('on',diffOn);
-  if(diffOn)buildDiffOverlay();
-  else removeDiffOverlay();
-});
-
-function buildDiffOverlay(){
-  removeDiffOverlay();
-  if(!cA||!cB)return;
-  const o=off(cur);
-  const s=renderScale;
-  const ox=Math.round(o.x*s),oy=Math.round(o.y*s);
-  const w=Math.max(cA.canvas.width,cB.canvas.width+Math.abs(ox));
-  const h=Math.max(cA.canvas.height,cB.canvas.height+Math.abs(oy));
-  const cw=Math.round(w/s),ch=Math.round(h/s);
-
-  // Composite both at render scale
-  const tA=document.createElement('canvas');tA.width=w;tA.height=h;
-  tA.getContext('2d').drawImage(cA.canvas,Math.max(0,-ox),Math.max(0,-oy));
-  const tB=document.createElement('canvas');tB.width=w;tB.height=h;
-  tB.getContext('2d').drawImage(cB.canvas,Math.max(0,ox),Math.max(0,oy));
-  const dA=tA.getContext('2d').getImageData(0,0,w,h).data;
-  const dB=tB.getContext('2d').getImageData(0,0,w,h).data;
-
-  // Build diff — only show CHANGED pixels as red, transparent elsewhere
-  const dc=document.createElement('canvas');dc.width=w;dc.height=h;dc.style.width=cw+'px';dc.style.height=ch+'px';
-  const ctx=dc.getContext('2d');const dd=ctx.createImageData(w,h);const pD=dd.data;
-  const thr=15;
-  for(let i=0;i<dA.length;i+=4){
-    const d=(Math.abs(dA[i]-dB[i])+Math.abs(dA[i+1]-dB[i+1])+Math.abs(dA[i+2]-dB[i+2]))/3;
-    if(d>thr){
-      pD[i]=255;pD[i+1]=30;pD[i+2]=60;pD[i+3]=Math.min(220,Math.max(100,d*2.5));
-    }
-    // else: leave transparent (0,0,0,0)
-  }
-  ctx.putImageData(dd,0,0);
-
-  const wrap=document.createElement('div');
-  wrap.className='diff-ovl';wrap.id='diffOvl';
-  wrap.style.left=Math.max(0,-o.x)+'px';wrap.style.top=Math.max(0,-o.y)+'px';
-  wrap.appendChild(dc);
-  W.appendChild(wrap);
-}
-
-function removeDiffOverlay(){
-  const el=$('diffOvl');if(el)el.remove();
-}
-
-// Re-apply diff overlay after scene rebuild if it was on
-const origBuildScene=buildScene;
-buildScene=function(){
-  origBuildScene();
-  if(diffOn&&cA&&cB)buildDiffOverlay();
-};
 </script>
 </body>
 </html>
