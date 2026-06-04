@@ -1,302 +1,721 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
-    <meta charset="UTF-8">
-    <title>PDF Comparator and Drawer (Vector & Native Export)</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; overflow: hidden; background: #f4f4f5; }
-        .container { display: flex; height: 100vh; width: 100vw; }
-        .menu { display: flex; flex-direction: column; width: 250px; padding: 15px; box-sizing: border-box; background: #fff; border-right: 1px solid #ddd; z-index: 10; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
-        .menu button, .menu input { margin-bottom: 12px; padding: 8px; font-size: 14px; width: 100%; box-sizing: border-box; }
-        .menu button { cursor: pointer; background: #2563eb; color: white; border: none; border-radius: 4px; transition: background 0.2s; }
-        .menu button:hover { background: #1d4ed8; }
-        .menu button.secondary { background: #e5e7eb; color: #1f2937; }
-        .menu button.secondary:hover { background: #d1d5db; }
-        #canvasContainer { position: relative; flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 20px; background: #525659; }
-        .canvas-wrapper { position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        canvas { position: absolute; top: 0; left: 0; }
-        .section { margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
-        .section h2 { margin-top: 0; font-size: 16px; color: #1f2937; }
-        .small-text { font-size: 0.75em; color: #6b7280; }
-        
-        /* A fabric.js canvas-t tartalmazó div */
-        .canvas-container { position: absolute !important; top: 0; left: 0; z-index: 5; }
-        #canvas1 { z-index: 1; }
-        #canvas2 { z-index: 2; pointer-events: none; /* Hogy a kattintás átmenjen a rajzvászonra */ }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Compare Pro — Darabos Csaba</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root{
+    --bg:#0b0d12;--s1:#13161e;--s2:#1a1e2a;--s3:#222838;
+    --brd:#272d40;--tx:#dce0ec;--tx2:#6f7590;--tx3:#454a60;
+    --ac:#4e88ff;--ac2:#7c5bf5;--grn:#3ddc84;--red:#ff4466;--ora:#ff9f43;--cyn:#00d2d3;--yel:#ffd93d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;user-select:none;}
+
+  /* ── Top bar ── */
+  .top{display:flex;align-items:center;gap:5px;padding:0 10px;height:38px;background:var(--s1);border-bottom:1px solid var(--brd);flex-shrink:0;}
+  .logo{font-size:12px;font-weight:700;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-right:6px;white-space:nowrap;}
+  .sep{width:1px;height:18px;background:var(--brd);margin:0 3px;}
+  .b{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:500;padding:3px 9px;border:1px solid var(--brd);border-radius:4px;background:var(--s2);color:var(--tx2);cursor:pointer;white-space:nowrap;transition:all .1s;display:flex;align-items:center;gap:3px;}
+  .b:hover{border-color:var(--ac);color:var(--tx);background:var(--s3);}
+  .b.on{background:var(--ac);color:#fff;border-color:var(--ac);}
+  .b.grn{border-color:var(--grn);color:var(--grn);}
+  .b:disabled{opacity:.25;pointer-events:none;}
+  .bg{display:flex;gap:1px;background:var(--brd);border-radius:4px;overflow:hidden;}
+  .bg .b{border:none;border-radius:0;}
+  .rw{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--tx2);}
+  .rw input[type=range]{width:65px;accent-color:var(--ac);}
+  .rv{font-family:'JetBrains Mono',monospace;font-size:9px;min-width:24px;text-align:right;color:var(--tx);}
+  .pn{display:flex;align-items:center;gap:3px;margin-left:auto;}
+  .zi{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--tx2);min-width:32px;text-align:center;}
+  input[type=color]{width:20px;height:20px;border:1px solid var(--brd);border-radius:3px;background:none;cursor:pointer;padding:0;}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:1px;}
+  input[type=color]::-webkit-color-swatch{border:none;border-radius:2px;}
+
+  /* ── Align bar ── */
+  .abar{display:none;align-items:center;gap:8px;padding:5px 10px;background:linear-gradient(90deg,rgba(124,91,245,.08),rgba(78,136,255,.04));border-bottom:2px solid var(--ac2);flex-shrink:0;font-size:10px;}
+  .abar.on{display:flex;}
+  .otag{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border-radius:3px;background:var(--s1);border:1px solid var(--brd);color:var(--yel);}
+
+  /* ── Viewport ── */
+  .vp{flex:1;overflow:hidden;position:relative;background:var(--bg);cursor:grab;}
+  .vp.pan{cursor:grabbing;}
+  .vp.draw{cursor:crosshair;}
+  .vp.alm{cursor:move;}
+  .w{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+  .la,.lb{position:absolute;top:0;left:0;}
+  .la canvas,.lb canvas{display:block;}
+  .lb.alvis{opacity:.5;outline:2px dashed var(--ora);outline-offset:-1px;}
+  .rendering-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 10px;border-radius:4px;background:rgba(78,136,255,.15);border:1px solid var(--ac);color:var(--ac);z-index:30;pointer-events:none;display:none;}
+  .rendering-badge.show{display:block;}
+
+  /* Swipe */
+  .sw-line{position:absolute;top:0;bottom:0;width:2px;background:var(--red);z-index:18;pointer-events:none;box-shadow:0 0 8px rgba(255,68,102,.4);}
+  .sw-handle{position:absolute;top:50%;transform:translate(-50%,-50%);width:20px;height:20px;background:var(--red);border-radius:50%;z-index:19;pointer-events:none;font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(255,68,102,.4);}
+
+  /* Diff legend */
+  .dl{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 10px;background:rgba(19,22,30,.9);border:1px solid var(--brd);border-radius:4px;font-size:9px;color:var(--tx2);z-index:20;backdrop-filter:blur(4px);}
+
+  /* Draw layer */
+  .drl{position:absolute;top:0;left:0;pointer-events:none;}
+  .drl.act{pointer-events:auto;cursor:crosshair;}
+  .drl canvas{display:block;}
+
+  /* Drop zones */
+  .dzs{position:absolute;inset:0;display:flex;gap:10px;padding:30px;z-index:5;}
+  .dz{flex:1;border:2px dashed var(--brd);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;transition:all .15s;position:relative;cursor:pointer;}
+  .dz:hover,.dz.ov{border-color:var(--ac);background:rgba(78,136,255,.03);}
+  .dz.ok{border-color:var(--grn);border-style:solid;background:rgba(61,220,132,.02);}
+  .dz .tg{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;color:var(--bg);}
+  .dz.za .tg{background:var(--ac);}
+  .dz.zb .tg{background:var(--ora);}
+  .dz p{font-size:10px;color:var(--tx2);}
+  .dz .fn{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--grn);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .dz input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
+  /* Status */
+  .sb{display:flex;align-items:center;gap:10px;padding:2px 10px;background:var(--s1);border-top:1px solid var(--brd);flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--tx3);}
+  .sb .h{margin-left:auto;color:var(--tx2);}
+
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+  .modal-bg.hide{display:none;}
+  .modal{background:var(--s1);border:1px solid var(--brd);border-radius:12px;width:min(680px,92vw);max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--brd);}
+  .modal-hd h2{font-size:16px;font-weight:700;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .modal-x{width:24px;height:24px;border-radius:4px;border:1px solid var(--brd);background:var(--s2);color:var(--tx2);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .modal-x:hover{background:var(--red);color:#fff;}
+  .modal-bd{padding:16px 20px 20px;}
+  .step{display:flex;gap:12px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--brd);}
+  .step:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+  .sn{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--ac);color:#fff;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .sc h3{font-size:12px;font-weight:600;margin-bottom:3px;}
+  .sc p{font-size:11px;color:var(--tx2);line-height:1.6;}
+  .sc p strong{color:var(--tx);}
+  .sc .kbd{font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--s2);border:1px solid var(--brd);border-radius:3px;padding:1px 4px;color:var(--tx);}
+  .modes-g{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;}
+  .mc{background:var(--s2);border:1px solid var(--brd);border-radius:6px;padding:8px 10px;}
+  .mc .mn{font-size:10px;font-weight:600;color:var(--ac);margin-bottom:2px;font-family:'JetBrains Mono',monospace;}
+  .mc p{font-size:10px;color:var(--tx2);line-height:1.4;}
+  .priv{display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:rgba(61,220,132,.04);border:1px solid rgba(61,220,132,.12);border-radius:6px;}
+  .priv span{font-size:9px;color:var(--grn);line-height:1.4;}
+  .modal-ft{padding:0 20px 16px;text-align:center;}
+  .go-btn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:8px 24px;border:none;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;box-shadow:0 3px 12px rgba(78,136,255,.3);}
+  .go-btn:hover{filter:brightness(1.1);}
+
+  /* Diff overlay layer */
+  .diff-ovl{position:absolute;top:0;left:0;pointer-events:none;z-index:12;opacity:.85;}
+  .diff-ovl canvas{display:block;}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="menu">
-            <div class="section">
-                <h2>1. PDF Összehasonlítás</h2>
-                <label for="file1" class="small-text">Alap terv (File 1):</label>
-                <input type="file" id="file1" accept="application/pdf">
-                <label for="file2" class="small-text">Módosított terv (File 2):</label>
-                <input type="file" id="file2" accept="application/pdf">
-                <button onclick="comparePDFs()">Betöltés és Összehasonlítás</button>
-                <label class="small-text">Villogtatás (Opacity):</label>
-                <input type="range" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
-                <button class="secondary" onclick="startBlinking()">Villogtatás Indítása</button>
-                <button class="secondary" onclick="stopBlinking()">Villogtatás Leállítása</button>
-            </div>
-            <div class="section">
-                <h2>2. Vektoros Annotáció</h2>
-                <p class="small-text">A formák mozgathatók és méretezhetők. Törlés: kijelölés + Delete gomb.</p>
-                <input type="color" id="colorPicker" value="#ef4444">
-                <button class="secondary" onclick="addText()">Szöveg Hozzáadása</button>
-                <button class="secondary" onclick="addCircle()">Kör Hozzáadása</button>
-                <button class="secondary" onclick="addLine()">Vonal Hozzáadása</button>
-            </div>
-            <div class="section">
-                <h2>3. Exportálás (Natív PDF)</h2>
-                <button onclick="exportNativePDF()">Exportálás (File 1 alapra)</button>
-            </div>
-            <div class="section small-text">
-                <p>PDF Comparator (Vector Beta)<br>Kliensoldali működés (Backend nélkül).</p>
-            </div>
-        </div>
-        <div id="canvasContainer">
-            <div class="canvas-wrapper" id="wrapper">
-                <canvas id="canvas1"></canvas>
-                <canvas id="canvas2"></canvas>
-                <canvas id="drawingCanvas"></canvas>
-            </div>
-        </div>
-    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<div class="top">
+  <span class="logo">PDF Compare Pro</span>
+  <div class="sep"></div>
+  <div class="bg" id="mGrp">
+    <button class="b on" data-m="overlay">Átfedés</button>
+    <button class="b" data-m="side">Párhuzamos</button>
+    <button class="b" data-m="diff">Hőtérkép</button>
+    <button class="b" data-m="swipe">Csúszka</button>
+  </div>
+  <div class="sep"></div>
+  <div class="rw" id="opC">Átlátszóság<input type="range" id="opS" min="0" max="100" value="50"><span class="rv" id="opV">50%</span></div>
+  <button class="b" id="blkB" title="Villogtatás">👁 Blink</button>
+  <div class="rw" id="thrC" style="display:none">Érzékenység<input type="range" id="thrS" min="1" max="80" value="20"><span class="rv" id="thrV">20</span></div>
+  <div class="sep"></div>
+  <button class="b" id="alB">⊞ Illesztés</button>
+  <button class="b" id="diffB" title="Pixel diff az aktuális renderelési élességen" style="border-color:var(--cyn);color:var(--cyn);">🔍 Diff</button>
+  <div class="sep"></div>
+  <div class="bg" id="dGrp">
+    <button class="b" data-d="line" title="Vonal">╱</button>
+    <button class="b" data-d="rect" title="Téglalap">▭</button>
+    <button class="b" data-d="circle" title="Kör">○</button>
+    <button class="b" data-d="arrow" title="Nyíl">→</button>
+    <button class="b" data-d="text" title="Szöveg">T</button>
+  </div>
+  <input type="color" id="dCol" value="#ff4466">
+  <button class="b" id="undoB">↩</button>
+  <button class="b" id="clrB">✕</button>
+  <div class="sep"></div>
+  <button class="b" id="expB">💾 Export</button>
+  <button class="b" id="helpB" title="Használati útmutató">?</button>
+  <div class="pn">
+    <button class="b" id="ppB">◀</button>
+    <span class="zi" id="pgI">—</span>
+    <button class="b" id="npB">▶</button>
+    <span class="zi" id="zI">100%</span>
+  </div>
+</div>
 
-    <script>
-        let blinking = false;
-        let blinkInterval;
-        let fabricCanvas;
-        let pdfScale = 1; // Eltároljuk a renderelési skálát a pontos PDF exporthoz
-        let originalPdfBytes = null; // Az 1-es fájl eredeti byte-tömbje a pdf-lib számára
+<div class="abar" id="aBar">
+  <span style="color:var(--ac2);font-weight:600;">⊞ Illesztés</span>
+  <span style="color:var(--tx2);">Húzd B-t · Nyíl:1px · Shift+nyíl:10px</span>
+  <span class="otag" id="oTag">ΔX:0 ΔY:0</span>
+  <button class="b" id="aaB">Mind</button>
+  <button class="b" id="arB">Reset</button>
+  <button class="b grn" id="adB">✓ Kész</button>
+</div>
 
-        document.addEventListener("DOMContentLoaded", () => {
-            // pdf.js worker beállítása
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-            
-            // Fabric.js inicializálása
-            fabricCanvas = new fabric.Canvas('drawingCanvas');
-            
-            // Objektum törlése Delete gombbal
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Delete' || e.key === 'Backspace') {
-                    const activeObjects = fabricCanvas.getActiveObjects();
-                    if (activeObjects.length) {
-                        fabricCanvas.discardActiveObject();
-                        activeObjects.forEach(function(object) {
-                            fabricCanvas.remove(object);
-                        });
-                    }
-                }
-            });
+<div class="modal-bg" id="howto">
+<div class="modal">
+  <div class="modal-hd"><h2>PDF Compare Pro — Használati útmutató</h2><button class="modal-x" id="htX">✕</button></div>
+  <div class="modal-bd">
 
-            document.getElementById('alphaSlider').addEventListener('input', (e) => {
-                document.getElementById('canvas2').style.opacity = e.target.value;
-            });
-        });
+    <div class="step"><div class="sn">1</div><div class="sc">
+      <h3>Töltsd fel a két PDF-et</h3>
+      <p>Húzd rá vagy kattints a feltöltő mezőkre. <strong>A = régi verzió</strong>, <strong>B = új verzió</strong>. Bármilyen PDF működik: műszaki rajz, szöveges dokumentum, vegyes tartalom. Többoldalas PDF-eket is kezel — a <span class="kbd">◀</span> <span class="kbd">▶</span> gombokkal vagy a <span class="kbd">←</span> <span class="kbd">→</span> billentyűkkel lapozhatsz.</p>
+    </div></div>
 
-        async function comparePDFs() {
-            const file1 = document.getElementById('file1').files[0];
-            const file2 = document.getElementById('file2').files[0];
-            if (file1 && file2) {
-                // Eltároljuk az első fájlt binárisan a későbbi natív exporthoz
-                originalPdfBytes = await file1.arrayBuffer(); 
-                
-                await displayPDF(file1, 'canvas1');
-                await displayPDF(file2, 'canvas2');
-            } else {
-                alert('Kérlek, válaszd ki mindkét PDF fájlt!');
-            }
-        }
+    <div class="step"><div class="sn">2</div><div class="sc">
+      <h3>Navigálás — zoom és pan</h3>
+      <p><strong>Egérgörgő</strong> = zoom (a kurzor pozíciójára fókuszálva). <strong>Húzás</strong> (bal klikk) = mozgatás (pan). Mobilon: <strong>csípés</strong> = zoom, <strong>egyujjas húzás</strong> = pan. A PDF <strong>vektoros minőségben</strong> renderelődik — bármennyire belenagyítasz, a szöveg és vonalak tűélesek maradnak. A „Renderelés..." felirat jelzi amikor az élesre rajzolás zajlik.</p>
+    </div></div>
 
-        async function displayPDF(file, canvasId) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-            const page = await pdf.getPage(1);
-            
-            // Fix szélességű renderelés a jobb kezelhetőségért (pl. 1200px)
-            const desiredWidth = 1200;
-            const viewport = page.getViewport({scale: 1});
-            pdfScale = desiredWidth / viewport.width;
-            const scaledViewport = page.getViewport({scale: pdfScale});
+    <div class="step"><div class="sn">3</div><div class="sc">
+      <h3>Összehasonlítás — 4 mód</h3>
+      <div class="modes-g">
+        <div class="mc"><div class="mn">Átfedés</div><p>A két PDF egymásra rajzolva. Az <strong>átlátszóság csúszkával</strong> állítod B láthatóságát. A <strong>👁 Blink</strong> gomb villogtatja B-t — ez a legjobb módszer apró eltérések gyors felismeréséhez (szövegváltozás, méreteltérés).</p></div>
+        <div class="mc"><div class="mn">Párhuzamos</div><p>A és B egymás mellett, azonos zoom szinten. Természetes összehasonlítás szabad szemmel.</p></div>
+        <div class="mc"><div class="mn">Hőtérkép</div><p>Pixelszintű különbség piros-magenta színnel. Az <strong>érzékenység csúszka</strong> állítja a küszöböt. Hasznos orientációs eszköz, de ne bízz benne vakon — az anti-aliasing és eltérő renderelés hamis jelzéseket adhat.</p></div>
+        <div class="mc"><div class="mn">Csúszka</div><p>Húzható függőleges választóvonal: balra az A, jobbra a B verzió. Rajzoknál ideális — a vonal mentén azonnal látod az eltéréseket.</p></div>
+      </div>
+    </div></div>
 
-            const canvas = document.getElementById(canvasId);
-            const context = canvas.getContext('2d');
-            
-            canvas.width = scaledViewport.width;
-            canvas.height = scaledViewport.height;
-            canvas.style.width = `${scaledViewport.width}px`;
-            canvas.style.height = `${scaledViewport.height}px`;
+    <div class="step"><div class="sn">⊞</div><div class="sc">
+      <h3>Manuális illesztés</h3>
+      <p>Ha a két PDF <strong>eltérő koordinátarendszerben</strong> lett mentve (más origó, más papírméret, más léptékű plot): az <strong>⊞ Illesztés</strong> gombbal kézzel ráhúzhatod a B réteget az A-ra. A narancs szaggatott keretű B réteget <strong>egérrel húzod</strong>, <span class="kbd">nyilakkal</span> finomhangolod (1px lépés), <span class="kbd">Shift+nyíl</span> = 10px. Az „Összes oldalra" gomb a beállítást minden oldalra alkalmazza. <strong>Enter</strong> vagy <strong>✓ Kész</strong> = visszalépés a normál nézetbe.</p>
+    </div></div>
 
-            // A wrapper és a fabric vászon méretének igazítása
-            if (canvasId === 'canvas1') {
-                const wrapper = document.getElementById('wrapper');
-                wrapper.style.width = `${scaledViewport.width}px`;
-                wrapper.style.height = `${scaledViewport.height}px`;
-                
-                fabricCanvas.setWidth(scaledViewport.width);
-                fabricCanvas.setHeight(scaledViewport.height);
-            }
+    <div class="step"><div class="sn">🔍</div><div class="sc">
+      <h3>Diff — pixel-alapú eltéréskeresés</h3>
+      <p>A <strong>🔍 Diff</strong> gomb egy piros átfedést rajzol a jelenlegi nézetre, ami mutatja a pixeleltéréseket. A kulcs: <strong>minél jobban belenagyítottál, annál pontosabb</strong> — mert a PDF vektoros renderelése annál élesebb. Tipp: nagyíts rá egy gyanús területre, majd nyomd meg a Diff-et. Újra megnyomva kikapcsol.</p>
+    </div></div>
 
-            await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
-        }
+    <div class="step"><div class="sn">✏</div><div class="sc">
+      <h3>Rajzeszközök és export</h3>
+      <p><strong>Vonal, téglalap, kör, nyíl, szöveg</strong> — jelöld meg az eltéréseket kézzel, kommentekkel. Szín választható. <strong>↩</strong> = visszavonás, <strong>✕</strong> = minden rajz törlése. A <strong>💾 Export</strong> gomb PNG-t generál az aktuális nézetből a rajzokkal együtt.</p>
+    </div></div>
 
-        // --- FABRIC.JS VEKTOROS RAJZOLÁS ---
-        
-        function getColor() {
-            return document.getElementById('colorPicker').value;
-        }
+    <div class="step"><div class="sn">💡</div><div class="sc">
+      <h3>Tippek haladóknak</h3>
+      <p>• A <strong>Blink mód</strong> a leggyorsabb módszer apró szöveg- és méreteltérések felisméréhez — az emberi szem kiválóan észleli a villogó különbségeket.<br>
+      • Építészeti rajzoknál először <strong>illeszd össze</strong> a két PDF-et, aztán <strong>Blink</strong>-kel nézd át oldalanként.<br>
+      • A <strong>Diff</strong> a jelenleg renderelt élességen dolgozik — 300%-os zoomban sokkal pontosabb mint 50%-oson.<br>
+      • A <strong>Hőtérkép</strong> mód hasznos a nagy eltérések gyors megtalálásához, a <strong>Blink</strong> az apróságokhoz.<br>
+      • A <span class="kbd">Space</span> billentyű nyomva tartásával rajzolás módban is tudsz pan-elni.</p>
+    </div></div>
 
-        function addText() {
-            const text = new fabric.IText('Kattints duplán a szerkesztéshez', {
-                left: fabricCanvas.width / 2 - 100,
-                top: fabricCanvas.height / 2,
-                fontFamily: 'Arial',
-                fill: getColor(),
-                fontSize: 24 * pdfScale
-            });
-            fabricCanvas.add(text).setActiveObject(text);
-        }
+    <div class="priv"><span>🔒</span><span><strong>A PDF-ek nem hagyják el a gépedet.</strong> Minden feldolgozás a böngészőben történik. Semmilyen adat nem kerül szerverre.<br>💡 <strong>Tipp:</strong> A mellékelt <code>start_server.bat</code> indítja a lokális szervert — így a PDF renderelés külön szálon fut és az UI sosem fagy le.</span></div>
+  </div>
+  <div class="modal-ft"><button class="go-btn" id="htGo">Értem, kezdjük!</button></div>
+</div>
+</div>
 
-        function addCircle() {
-            const circle = new fabric.Circle({
-                radius: 30 * pdfScale,
-                fill: 'transparent',
-                stroke: getColor(),
-                strokeWidth: 3 * pdfScale,
-                left: fabricCanvas.width / 2,
-                top: fabricCanvas.height / 2,
-                originX: 'center',
-                originY: 'center'
-            });
-            fabricCanvas.add(circle).setActiveObject(circle);
-        }
+<div class="vp" id="vp">
+  <div class="w" id="W"></div>
+  <div class="rendering-badge" id="rBadge">Renderelés...</div>
+  <div class="dzs" id="dzs">
+    <div class="dz za" id="dzA"><span class="tg">A — RÉGI</span><p id="dlA">PDF ide</p><span class="fn" id="fnA"></span><input type="file" accept=".pdf" id="fA"></div>
+    <div class="dz zb" id="dzB"><span class="tg">B — ÚJ</span><p id="dlB">PDF ide</p><span class="fn" id="fnB"></span><input type="file" accept=".pdf" id="fB"></div>
+  </div>
+</div>
 
-        function addLine() {
-            const line = new fabric.Line([50, 100, 200, 200], {
-                left: fabricCanvas.width / 2,
-                top: fabricCanvas.height / 2,
-                stroke: getColor(),
-                strokeWidth: 3 * pdfScale
-            });
-            // Hogy a vonal végeit lehessen mozgatni, érdemes extra beállításokat tenni,
-            // de egyelőre skálázható és forgatható objektumként jön létre.
-            line.setControlsVisibility({
-                bl: false, br: false, tl: false, tr: false, mt: false, mb: false
-            });
-            fabricCanvas.add(line).setActiveObject(line);
-        }
+<div class="sb">
+  <span id="sC"></span>
+  <span id="sZ"></span>
+  <span id="sP"></span>
+  <span class="h" id="sH">Görgő: zoom · Húzás: pan · Nyilak: lapozás</span>
+</div>
 
-        // --- VILLOGTATÁS ---
-        function startBlinking() {
-            blinking = true;
-            blink();
-        }
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Smart worker: on http(s) the worker runs on a separate thread (fast)
+// On file:// it falls back to main thread (still works, just blocks UI during render)
+if(location.protocol==='file:'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='';
+  console.log('PDF.js: main thread mód (file://). Tipp: futtasd localhost-ról a jobb teljesítményért!');
+}else{
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  console.log('PDF.js: Web Worker mód (gyors)');
+}
 
-        function stopBlinking() {
-            blinking = false;
-            clearTimeout(blinkInterval);
-            document.getElementById('canvas2').style.opacity = document.getElementById('alphaSlider').value;
-        }
+const $=id=>document.getElementById(id);
+const vpEl=$('vp'),W=$('W');
 
-        function blink() {
-            if (!blinking) return;
-            const canvas2 = document.getElementById('canvas2');
-            canvas2.style.opacity = canvas2.style.opacity == 0 ? 1 : 0;
-            blinkInterval = setTimeout(blink, 500);
-        }
+// ═══ STATE ═══
+let pdfA=null,pdfB=null,pgA=null,pgB=null; // pdf docs and current page objects
+let cur=1,total=1,mode='overlay';
+let vp={x:0,y:0,z:1};
+const ZMIN=.05,ZMAX=30;
 
-        // --- PDF-LIB NATÍV EXPORTÁLÁS ---
-        
-        // Segédfüggvény: HEX to RGB (0-1 tartomány)
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16) / 255,
-                g: parseInt(result[2], 16) / 255,
-                b: parseInt(result[3], 16) / 255
-            } : { r: 0, g: 0, b: 0 };
-        }
+// Rendered canvases at current render scale
+let cA=null,cB=null; // {canvas, scale, w, h} (w,h = CSS display size at scale=1)
+let renderScale=1; // current render DPI multiplier
+let renderTimer=null;
+let baseW=0,baseH=0; // page dimensions in PDF points
 
-        async function exportNativePDF() {
-            if (!originalPdfBytes) {
-                alert('Még nincs betöltve PDF!');
-                return;
-            }
+// Alignment
+let alignOn=false,pgOff={},gOff={x:0,y:0};
+let alDr={on:false,sx:0,sy:0,ox:0,oy:0};
 
-            const { PDFDocument, rgb } = PDFLib;
-            
-            // Betöltjük az eredeti PDF fájlt a memóriába
-            const pdfDoc = await PDFDocument.load(originalPdfBytes);
-            const pages = pdfDoc.getPages();
-            const page = pages[0]; // Első oldal
-            const { height } = page.getSize();
+// Pan
+let pan={on:false,sx:0,sy:0,vx:0,vy:0};
+let spHeld=false;
 
-            // Végigmegyünk a Fabric.js vásznon lévő összes vektoros elemen
-            const objects = fabricCanvas.getObjects();
-            
-            for (let obj of objects) {
-                // A böngésző pixeleket vissza kell osztani a pdfScale-lel, hogy megkapjuk a natív PDF pontokat
-                const x = obj.left / pdfScale;
-                // A PDF-ben az Y tengely lentről felfelé nő, a böngészőben fentről lefelé
-                const y = height - (obj.top / pdfScale); 
-                
-                const colorObj = hexToRgb(obj.stroke || obj.fill);
-                const pdfColor = rgb(colorObj.r, colorObj.g, colorObj.b);
+// Blink
+let blinkOn=false,blinkT=null;
 
-                if (obj.type === 'i-text' || obj.type === 'text') {
-                    // Az i-text origója máshol van, ezért az Y-t picit korrigáljuk a font méretével
-                    const fontSize = obj.fontSize / pdfScale;
-                    page.drawText(obj.text, {
-                        x: x,
-                        y: y - fontSize, 
-                        size: fontSize,
-                        color: pdfColor
-                    });
-                } 
-                else if (obj.type === 'circle') {
-                    const radius = (obj.radius * obj.scaleX) / pdfScale;
-                    page.drawCircle({
-                        x: x + radius,
-                        y: y - radius,
-                        size: radius,
-                        borderColor: pdfColor,
-                        borderWidth: obj.strokeWidth / pdfScale,
-                        color: rgb(1,1,1), // Átlátszóság beállítása a pdf-lib-ben komplexebb, itt most kitöltetlen maradna
-                        opacity: 0, // Kitöltés átlátszó
-                        borderOpacity: 1
-                    });
-                }
-                else if (obj.type === 'line') {
-                    // Vonal koordinátáinak leképezése
-                    const x1 = (obj.left + obj.x1 * obj.scaleX) / pdfScale;
-                    const y1 = height - ((obj.top + obj.y1 * obj.scaleY) / pdfScale);
-                    const x2 = (obj.left + obj.x2 * obj.scaleX) / pdfScale;
-                    const y2 = height - ((obj.top + obj.y2 * obj.scaleY) / pdfScale);
-                    
-                    page.drawLine({
-                        start: { x: x1, y: y1 },
-                        end: { x: x2, y: y2 },
-                        thickness: obj.strokeWidth / pdfScale,
-                        color: pdfColor
-                    });
-                }
-            }
+// Swipe
+let swX=.5,swDr=false;
 
-            // PDF generálása és letöltése
-            const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'annotalt_tervrajz.pdf';
-            link.click();
-        }
-    </script>
+// Draw
+let dMode='',dCol='#ff4466',dAct=false,dS={x:0,y:0},dC={x:0,y:0};
+let draws=[];
+
+// ═══ HELPERS ═══
+function off(pg){return pgOff[pg]?{...pgOff[pg]}:{...gOff};}
+function setOff(pg,x,y){pgOff[pg]={x,y};$('oTag').textContent=`ΔX:${Math.round(x)} ΔY:${Math.round(y)}`;updAlBtn();}
+function hasOff(){if(gOff.x||gOff.y)return true;for(const k in pgOff)if(pgOff[k].x||pgOff[k].y)return true;return false;}
+function updAlBtn(){const b=$('alB');if(hasOff()){b.classList.add('grn');b.textContent='⊞ Illesztve';}else{b.classList.remove('grn');b.textContent='⊞ Illesztés';}}
+
+function applyVP(){
+  W.style.transform=`translate(${vp.x}px,${vp.y}px) scale(${vp.z})`;
+  $('zI').textContent=Math.round(vp.z*100)+'%';
+  $('sZ').textContent='Z:'+Math.round(vp.z*100)+'%';
+  scheduleRender();
+}
+function fitW(w,h){
+  const vw=vpEl.clientWidth,vh=vpEl.clientHeight,p=20;
+  vp.z=Math.min((vw-p)/w,(vh-p)/h,2);
+  vp.x=(vw-w*vp.z)/2;vp.y=(vh-h*vp.z)/2;
+  applyVP();
+}
+
+// ═══ SMART RENDER — re-render PDFs at current zoom for sharpness ═══
+function scheduleRender(){
+  clearTimeout(renderTimer);
+  const needed=Math.max(1,vp.z*1.2); // target render scale
+  if(needed>renderScale*1.4||needed<renderScale*0.3){
+    // Significant zoom change — schedule re-render
+    $('rBadge').classList.add('show');
+    renderTimer=setTimeout(()=>doRender(needed),250);
+  }
+}
+
+async function doRender(targetScale){
+  if(!pdfA&&!pdfB){$('rBadge').classList.remove('show');return;}
+  const s=Math.min(targetScale,10);
+  renderScale=s;
+  try{
+    const[a,b]=await Promise.all([renderPg(pdfA,cur,s),renderPg(pdfB,cur,s)]);
+    cA=a;cB=b;
+    if(a){baseW=a.w;baseH=a.h;}else if(b){baseW=b.w;baseH=b.h;}
+  }catch(e){console.error('Render error:',e);}
+  $('rBadge').classList.remove('show');
+  buildScene();
+}
+
+async function renderPg(pdf,pg,s){
+  if(!pdf||pg>pdf.numPages)return null;
+  try{
+    const page=await pdf.getPage(pg);
+    const v=page.getViewport({scale:s});
+    const c=document.createElement('canvas');
+    c.width=Math.floor(v.width);c.height=Math.floor(v.height);
+    await page.render({canvasContext:c.getContext('2d'),viewport:v}).promise;
+    const v1=page.getViewport({scale:1});
+    return{canvas:c,scale:s,w:v1.width,h:v1.height};
+  }catch(e){console.error('Page render error:',e);return null;}
+}
+
+// ═══ UPLOAD ═══
+['A','B'].forEach(id=>{
+  const inp=$('f'+id),dz=$('dz'+id);
+  inp.addEventListener('change',e=>loadF(e.target.files[0],id));
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('ov');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('ov'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('ov');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')loadF(f,id);});
+});
+
+async function loadF(file,id){
+  try{
+    const buf=await file.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+    if(id==='A')pdfA=pdf;else pdfB=pdf;
+    $('dz'+id).classList.add('ok');
+    $('dl'+id).textContent='✓ '+pdf.numPages+' oldal';
+    $('fn'+id).textContent=file.name;
+    if(pdfA&&pdfB)await init();
+  }catch(e){
+    console.error('PDF load error:',e);
+    $('dl'+id).textContent='✗ Hiba!';
+    $('dl'+id).style.color='var(--red)';
+  }
+}
+
+async function init(){
+  total=Math.max(pdfA.numPages,pdfB.numPages);cur=1;
+  $('dzs').style.display='none';
+  renderScale=1;
+  await doRender(1);
+  fitW(baseW*(mode==='side'?2.1:1),baseH);
+}
+
+// ═══ SCENE BUILD ═══
+function buildScene(){
+  W.innerHTML='';
+  if(!cA&&!cB)return;
+  vpEl.querySelectorAll('.dl,.sw-line,.sw-handle').forEach(e=>e.remove());
+  updPgUI();
+
+  if(alignOn){buildAlign();return;}
+  if(mode==='overlay')buildOvl();
+  else if(mode==='side')buildSide();
+  else if(mode==='diff')buildDiff();
+  else if(mode==='swipe')buildSwipe();
+
+  buildDraw();
+}
+
+function mkC(src){
+  // Create a canvas element that displays at PDF-point size, with high-res render
+  const c=document.createElement('canvas');
+  c.width=src.canvas.width;c.height=src.canvas.height;
+  c.style.width=src.w+'px';c.style.height=src.h+'px';
+  c.getContext('2d').drawImage(src.canvas,0,0);
+  return c;
+}
+
+function mkD(cls){const d=document.createElement('div');d.className=cls;return d;}
+function addLbl(el,t,isA){const l=document.createElement('div');l.style.cssText=`position:absolute;top:3px;left:3px;font-family:JetBrains Mono,monospace;font-size:7px;padding:1px 4px;border-radius:2px;z-index:5;color:${isA?'#fff':'#111'};background:${isA?'var(--ac)':'var(--ora)'};`;l.textContent=t;el.appendChild(l);}
+
+function buildOvl(){
+  const o=off(cur),w=Math.max(baseW,(cB?cB.w:0)+Math.abs(o.x)),h=Math.max(baseH,(cB?cB.h:0)+Math.abs(o.y));
+  W.style.width=w+'px';W.style.height=h+'px';
+  if(cA){const d=mkD('la');d.style.left=Math.max(0,-o.x)+'px';d.style.top=Math.max(0,-o.y)+'px';d.appendChild(mkC(cA));addLbl(d,'A',true);W.appendChild(d);}
+  if(cB){const d=mkD('lb');d.id='lB';d.style.left=Math.max(0,o.x)+'px';d.style.top=Math.max(0,o.y)+'px';d.style.opacity=$('opS').value/100;d.appendChild(mkC(cB));addLbl(d,'B',false);W.appendChild(d);}
+}
+
+function buildSide(){
+  const g=16;const tw=(cA?cA.w:0)+(cB?cB.w:0)+g,mh=Math.max(cA?cA.h:0,cB?cB.h:0);
+  W.style.width=tw+'px';W.style.height=mh+'px';
+  if(cA){const d=mkD('la');d.appendChild(mkC(cA));addLbl(d,'A',true);W.appendChild(d);}
+  if(cB){const d=mkD('lb');d.style.left=((cA?cA.w:0)+g)+'px';d.appendChild(mkC(cB));addLbl(d,'B',false);W.appendChild(d);}
+}
+
+function buildDiff(){
+  if(!cA||!cB)return;
+  const o=off(cur);
+  const s=renderScale;
+  const ox=Math.round(o.x*s),oy=Math.round(o.y*s);
+  const w=Math.max(cA.canvas.width,cB.canvas.width+Math.abs(ox)),h=Math.max(cA.canvas.height,cB.canvas.height+Math.abs(oy));
+  const cw=Math.round(w/s),ch=Math.round(h/s);
+  const tA=document.createElement('canvas');tA.width=w;tA.height=h;
+  tA.getContext('2d').drawImage(cA.canvas,Math.max(0,-ox),Math.max(0,-oy));
+  const tB=document.createElement('canvas');tB.width=w;tB.height=h;
+  tB.getContext('2d').drawImage(cB.canvas,Math.max(0,ox),Math.max(0,oy));
+  const dA=tA.getContext('2d').getImageData(0,0,w,h).data,dB=tB.getContext('2d').getImageData(0,0,w,h).data;
+  const dc=document.createElement('canvas');dc.width=w;dc.height=h;dc.style.width=cw+'px';dc.style.height=ch+'px';
+  const ctx=dc.getContext('2d');const dd=ctx.createImageData(w,h);const pD=dd.data;
+  const thr=parseInt($('thrS').value);let ch2=0;
+  for(let i=0;i<dA.length;i+=4){
+    const d=(Math.abs(dA[i]-dB[i])+Math.abs(dA[i+1]-dB[i+1])+Math.abs(dA[i+2]-dB[i+2]))/3;
+    if(d>thr){const v=Math.min(255,d*3);pD[i]=255;pD[i+1]=40;pD[i+2]=80;pD[i+3]=Math.max(80,v);ch2++;}
+    else{pD[i]=Math.round(dA[i]*.85+dB[i]*.15);pD[i+1]=Math.round(dA[i+1]*.85+dB[i+1]*.15);pD[i+2]=Math.round(dA[i+2]*.85+dB[i+2]*.15);pD[i+3]=255;}
+  }
+  ctx.putImageData(dd,0,0);
+  W.style.width=cw+'px';W.style.height=ch+'px';
+  const dv=mkD('la');dv.appendChild(dc);W.appendChild(dv);
+  const leg=document.createElement('div');leg.className='dl';
+  leg.innerHTML=`<span style="color:var(--red)">■</span> Eltérés: ${((ch2/(w*h))*100).toFixed(2)}%`;
+  vpEl.appendChild(leg);
+}
+
+function buildSwipe(){
+  if(!cA||!cB)return;
+  const o=off(cur),w=Math.max(cA.w,cB.w),h=Math.max(cA.h,cB.h);
+  W.style.width=w+'px';W.style.height=h+'px';
+  const dA=mkD('la');dA.id='swA';dA.appendChild(mkC(cA));addLbl(dA,'A',true);
+  const dB=mkD('lb');dB.id='swB';dB.style.left=o.x+'px';dB.style.top=o.y+'px';dB.appendChild(mkC(cB));addLbl(dB,'B',false);
+  const cx=swX*w;
+  dA.style.clipPath=`inset(0 ${w-cx}px 0 0)`;
+  dB.style.clipPath=`inset(0 0 0 ${cx-o.x}px)`;
+  W.appendChild(dA);W.appendChild(dB);
+  const ln=document.createElement('div');ln.className='sw-line';ln.style.left=cx+'px';ln.style.height=h+'px';ln.style.position='absolute';ln.style.top='0';
+  const hd=document.createElement('div');hd.className='sw-handle';hd.style.left=cx+'px';hd.style.top=(h/2)+'px';hd.style.position='absolute';hd.textContent='⇔';
+  W.appendChild(ln);W.appendChild(hd);
+  W._sw={dA,dB,ln,hd,w,ox:o.x};
+}
+
+function buildAlign(){
+  if(!cA&&!cB)return;
+  const w=Math.max(cA?cA.w:0,cB?cB.w:0)+80,h=Math.max(cA?cA.h:0,cB?cB.h:0)+80;
+  W.style.width=w+'px';W.style.height=h+'px';
+  if(cA){const d=mkD('la');d.appendChild(mkC(cA));addLbl(d,'A',true);W.appendChild(d);}
+  if(cB){const o=off(cur);const d=mkD('lb alvis');d.id='alBL';d.style.left=o.x+'px';d.style.top=o.y+'px';d.appendChild(mkC(cB));addLbl(d,'B',false);W.appendChild(d);$('oTag').textContent=`ΔX:${Math.round(o.x)} ΔY:${Math.round(o.y)}`;}
+}
+
+function buildDraw(){
+  const w=parseInt(W.style.width)||baseW,h=parseInt(W.style.height)||baseH;
+  const wr=mkD('drl');wr.id='drL';
+  const c=document.createElement('canvas');c.width=Math.round(w*2);c.height=Math.round(h*2);c.style.width=w+'px';c.style.height=h+'px';c.id='drC';
+  wr.appendChild(c);W.appendChild(wr);
+  redrawD(c);
+}
+
+function redrawD(canvas){
+  if(!canvas)canvas=$('drC');if(!canvas)return;
+  const ctx=canvas.getContext('2d'),S=2;ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.lineWidth=2*S;ctx.lineCap='round';
+  for(const d of draws){
+    ctx.strokeStyle=d.color;ctx.fillStyle=d.color;
+    if(d.type==='line'){ctx.beginPath();ctx.moveTo(d.pts[0]*S,d.pts[1]*S);ctx.lineTo(d.pts[2]*S,d.pts[3]*S);ctx.stroke();}
+    else if(d.type==='rect'){ctx.strokeRect(d.pts[0]*S,d.pts[1]*S,d.pts[2]*S,d.pts[3]*S);}
+    else if(d.type==='circle'){ctx.beginPath();ctx.arc(d.pts[0]*S,d.pts[1]*S,d.pts[2]*S,0,Math.PI*2);ctx.stroke();}
+    else if(d.type==='arrow'){const[x1,y1,x2,y2]=d.pts;ctx.beginPath();ctx.moveTo(x1*S,y1*S);ctx.lineTo(x2*S,y2*S);ctx.stroke();const a=Math.atan2(y2-y1,x2-x1),hl=12;ctx.beginPath();ctx.moveTo(x2*S,y2*S);ctx.lineTo((x2-hl*Math.cos(a-.5))*S,(y2-hl*Math.sin(a-.5))*S);ctx.moveTo(x2*S,y2*S);ctx.lineTo((x2-hl*Math.cos(a+.5))*S,(y2-hl*Math.sin(a+.5))*S);ctx.stroke();}
+    else if(d.type==='text'){ctx.font=`${14*S}px 'DM Sans',sans-serif`;ctx.fillText(d.text,d.pts[0]*S,d.pts[1]*S);}
+  }
+}
+
+function updPgUI(){$('pgI').textContent=`${cur}/${total}`;$('ppB').disabled=cur<=1;$('npB').disabled=cur>=total;$('sP').textContent=`P:${cur}/${total}`;}
+
+// ═══ VIEWPORT ═══
+vpEl.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=vpEl.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const wx=(mx-vp.x)/vp.z,wy=(my-vp.y)/vp.z;
+  const d=e.deltaY>0?.88:1/.88;
+  vp.z=Math.min(ZMAX,Math.max(ZMIN,vp.z*d));
+  vp.x=mx-wx*vp.z;vp.y=my-wy*vp.z;
+  applyVP();
+},{passive:false});
+
+vpEl.addEventListener('mousedown',e=>{
+  if(mode==='swipe'&&!spHeld&&!alignOn&&!dMode&&e.button===0){swDr=true;doSw(e);return;}
+  if(alignOn&&!spHeld&&e.button===0){alDr={on:true,sx:e.clientX,sy:e.clientY,ox:off(cur).x,oy:off(cur).y};vpEl.classList.add('alm');return;}
+  if(dMode&&!spHeld&&e.button===0){startDr(e);return;}
+  if(e.button===0||e.button===1){e.preventDefault();pan={on:true,sx:e.clientX,sy:e.clientY,vx:vp.x,vy:vp.y};vpEl.classList.add('pan');}
+});
+
+window.addEventListener('mousemove',e=>{
+  if(pan.on){vp.x=pan.vx+(e.clientX-pan.sx);vp.y=pan.vy+(e.clientY-pan.sy);applyVP();return;}
+  if(alDr.on){const dx=(e.clientX-alDr.sx)/vp.z,dy=(e.clientY-alDr.sy)/vp.z;setOff(cur,alDr.ox+dx,alDr.oy+dy);const el=$('alBL');if(el){el.style.left=(alDr.ox+dx)+'px';el.style.top=(alDr.oy+dy)+'px';}return;}
+  if(dAct){moveDr(e);return;}
+  if(swDr){doSw(e);return;}
+  const r=vpEl.getBoundingClientRect();$('sC').textContent=`${Math.round((e.clientX-r.left-vp.x)/vp.z)},${Math.round((e.clientY-r.top-vp.y)/vp.z)}`;
+});
+
+window.addEventListener('mouseup',()=>{
+  if(pan.on){pan.on=false;vpEl.classList.remove('pan');}
+  if(alDr.on){alDr.on=false;vpEl.classList.remove('alm');}
+  if(dAct)endDr();
+  swDr=false;
+});
+vpEl.addEventListener('contextmenu',e=>e.preventDefault());
+
+// Touch
+let tc={p:false,pi:false,ld:0,sx:0,sy:0,vx:0,vy:0};
+vpEl.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){e.preventDefault();tc.pi=true;tc.ld=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}
+  else if(e.touches.length===1){
+    if(alignOn){alDr={on:true,sx:e.touches[0].clientX,sy:e.touches[0].clientY,ox:off(cur).x,oy:off(cur).y};return;}
+    tc.p=true;tc.sx=e.touches[0].clientX;tc.sy=e.touches[0].clientY;tc.vx=vp.x;tc.vy=vp.y;
+  }
+},{passive:false});
+vpEl.addEventListener('touchmove',e=>{
+  if(tc.pi&&e.touches.length===2){
+    e.preventDefault();const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    const r=d/tc.ld;const rc=vpEl.getBoundingClientRect();
+    const mx=(e.touches[0].clientX+e.touches[1].clientX)/2-rc.left,my=(e.touches[0].clientY+e.touches[1].clientY)/2-rc.top;
+    const wx=(mx-vp.x)/vp.z,wy=(my-vp.y)/vp.z;
+    vp.z=Math.min(ZMAX,Math.max(ZMIN,vp.z*r));vp.x=mx-wx*vp.z;vp.y=my-wy*vp.z;tc.ld=d;applyVP();
+  }else if(tc.p&&e.touches.length===1){
+    if(alDr.on){const dx=(e.touches[0].clientX-alDr.sx)/vp.z,dy=(e.touches[0].clientY-alDr.sy)/vp.z;setOff(cur,alDr.ox+dx,alDr.oy+dy);const el=$('alBL');if(el){el.style.left=(alDr.ox+dx)+'px';el.style.top=(alDr.oy+dy)+'px';}return;}
+    vp.x=tc.vx+(e.touches[0].clientX-tc.sx);vp.y=tc.vy+(e.touches[0].clientY-tc.sy);applyVP();
+  }
+},{passive:false});
+vpEl.addEventListener('touchend',e=>{if(e.touches.length<2)tc.pi=false;if(!e.touches.length){tc.p=false;alDr.on=false;}});
+
+// Keys
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!e.repeat){spHeld=true;e.preventDefault();}
+  if(alignOn&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)){
+    e.preventDefault();const s=e.shiftKey?10:1;const o=off(cur);let nx=o.x,ny=o.y;
+    if(e.key==='ArrowLeft')nx-=s;if(e.key==='ArrowRight')nx+=s;if(e.key==='ArrowUp')ny-=s;if(e.key==='ArrowDown')ny+=s;
+    setOff(cur,nx,ny);const el=$('alBL');if(el){el.style.left=nx+'px';el.style.top=ny+'px';}return;
+  }
+  if(alignOn&&(e.key==='Enter'||e.key==='Escape')){$('adB').click();return;}
+  if(!alignOn&&!dMode){
+    if(e.key==='ArrowLeft'&&cur>1){cur--;changePg();}
+    if(e.key==='ArrowRight'&&cur<total){cur++;changePg();}
+  }
+});
+window.addEventListener('keyup',e=>{if(e.code==='Space')spHeld=false;});
+
+// Swipe
+function doSw(e){
+  if(mode!=='swipe')return;const r=vpEl.getBoundingClientRect();
+  const wx=(e.clientX-r.left-vp.x)/vp.z;const sd=W._sw;if(!sd)return;
+  const x=Math.max(0,Math.min(wx,sd.w));swX=x/sd.w;
+  sd.dA.style.clipPath=`inset(0 ${sd.w-x}px 0 0)`;
+  sd.dB.style.clipPath=`inset(0 0 0 ${x-sd.ox}px)`;
+  sd.ln.style.left=x+'px';sd.hd.style.left=x+'px';
+}
+
+// ═══ DRAWING ═══
+function startDr(e){
+  dAct=true;const r=vpEl.getBoundingClientRect();
+  dS.x=(e.clientX-r.left-vp.x)/vp.z;dS.y=(e.clientY-r.top-vp.y)/vp.z;dC={...dS};
+  if(dMode==='text'){const t=prompt('Szöveg:');if(t){draws.push({type:'text',pts:[dS.x,dS.y],color:dCol,text:t});redrawD();}dAct=false;return;}
+}
+function moveDr(e){
+  const r=vpEl.getBoundingClientRect();dC.x=(e.clientX-r.left-vp.x)/vp.z;dC.y=(e.clientY-r.top-vp.y)/vp.z;
+  const c=$('drC');if(!c)return;const ctx=c.getContext('2d'),S=2;ctx.clearRect(0,0,c.width,c.height);redrawD(c);
+  ctx.strokeStyle=dCol;ctx.lineWidth=2*S;ctx.setLineDash([4*S,4*S]);
+  if(dMode==='line'){ctx.beginPath();ctx.moveTo(dS.x*S,dS.y*S);ctx.lineTo(dC.x*S,dC.y*S);ctx.stroke();}
+  else if(dMode==='rect'){ctx.strokeRect(Math.min(dS.x,dC.x)*S,Math.min(dS.y,dC.y)*S,Math.abs(dC.x-dS.x)*S,Math.abs(dC.y-dS.y)*S);}
+  else if(dMode==='circle'){const rad=Math.hypot(dC.x-dS.x,dC.y-dS.y);ctx.beginPath();ctx.arc(dS.x*S,dS.y*S,rad*S,0,Math.PI*2);ctx.stroke();}
+  else if(dMode==='arrow'){ctx.beginPath();ctx.moveTo(dS.x*S,dS.y*S);ctx.lineTo(dC.x*S,dC.y*S);ctx.stroke();}
+  ctx.setLineDash([]);
+}
+function endDr(){
+  if(!dAct)return;dAct=false;
+  if(dMode==='line')draws.push({type:'line',pts:[dS.x,dS.y,dC.x,dC.y],color:dCol});
+  else if(dMode==='rect')draws.push({type:'rect',pts:[Math.min(dS.x,dC.x),Math.min(dS.y,dC.y),Math.abs(dC.x-dS.x),Math.abs(dC.y-dS.y)],color:dCol});
+  else if(dMode==='circle')draws.push({type:'circle',pts:[dS.x,dS.y,Math.hypot(dC.x-dS.x,dC.y-dS.y)],color:dCol});
+  else if(dMode==='arrow')draws.push({type:'arrow',pts:[dS.x,dS.y,dC.x,dC.y],color:dCol});
+  redrawD();
+}
+
+// ═══ EVENTS ═══
+// Mode
+document.querySelectorAll('#mGrp .b').forEach(b=>b.addEventListener('click',()=>{
+  if(alignOn)return;
+  document.querySelectorAll('#mGrp .b').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');mode=b.dataset.m;
+  $('opC').style.display=mode==='overlay'?'':'none';
+  $('blkB').style.display=mode==='overlay'?'':'none';
+  $('thrC').style.display=mode==='diff'?'':'none';
+  vpEl.querySelectorAll('.dl').forEach(e=>e.remove());
+  buildScene();
+}));
+
+$('opS').addEventListener('input',e=>{$('opV').textContent=e.target.value+'%';const l=W.querySelector('.lb');if(l)l.style.opacity=e.target.value/100;});
+$('thrS').addEventListener('input',e=>{$('thrV').textContent=e.target.value;vpEl.querySelectorAll('.dl').forEach(x=>x.remove());buildScene();});
+
+// Blink
+$('blkB').addEventListener('click',()=>{
+  blinkOn=!blinkOn;$('blkB').classList.toggle('on',blinkOn);
+  if(blinkOn)doBl();else{clearTimeout(blinkT);const l=W.querySelector('.lb');if(l)l.style.opacity=$('opS').value/100;}
+});
+function doBl(){if(!blinkOn)return;const l=W.querySelector('.lb');if(l)l.style.opacity=l.style.opacity==='0'?'1':'0';blinkT=setTimeout(doBl,400);}
+
+// Pages
+async function changePg(){renderScale=1;await doRender(vp.z);if(alignOn)buildAlign();}
+$('ppB').addEventListener('click',()=>{if(cur>1){cur--;changePg();}});
+$('npB').addEventListener('click',()=>{if(cur<total){cur++;changePg();}});
+
+// Align
+$('alB').addEventListener('click',()=>{if(!pdfA||!pdfB)return;if(alignOn){exitAl();return;}enterAl();});
+$('adB').addEventListener('click',()=>{exitAl();buildScene();});
+$('arB').addEventListener('click',()=>{pgOff={};gOff={x:0,y:0};$('oTag').textContent='ΔX:0 ΔY:0';updAlBtn();buildScene();});
+$('aaB').addEventListener('click',()=>{const o=off(cur);gOff={x:o.x,y:o.y};pgOff={};pgOff[cur]={x:o.x,y:o.y};});
+function enterAl(){alignOn=true;$('aBar').classList.add('on');document.querySelectorAll('#mGrp .b').forEach(b=>b.disabled=true);$('sH').textContent='Húzd B-t · Nyíl:1px · Shift+nyíl:10px';buildScene();}
+function exitAl(){alignOn=false;$('aBar').classList.remove('on');document.querySelectorAll('#mGrp .b').forEach(b=>b.disabled=false);$('sH').textContent='Görgő: zoom · Húzás: pan · Nyilak: lapozás';updAlBtn();}
+
+// Draw
+document.querySelectorAll('#dGrp .b').forEach(b=>b.addEventListener('click',()=>{
+  const d=b.dataset.d;
+  if(dMode===d){dMode='';b.classList.remove('on');vpEl.classList.remove('draw');$('drL')?.classList.remove('act');return;}
+  document.querySelectorAll('#dGrp .b').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');dMode=d;vpEl.classList.add('draw');const dl=$('drL');if(dl)dl.classList.add('act');
+}));
+$('dCol').addEventListener('input',e=>{dCol=e.target.value;});
+$('undoB').addEventListener('click',()=>{draws.pop();redrawD();});
+$('clrB').addEventListener('click',()=>{draws=[];redrawD();});
+
+// Export
+$('expB').addEventListener('click',async()=>{
+  if(!cA&&!cB)return;
+  const w=baseW,h=baseH,s=Math.max(renderScale,2);
+  const[a,b]=await Promise.all([renderPg(pdfA,cur,s),renderPg(pdfB,cur,s)]);
+  const exp=document.createElement('canvas');exp.width=Math.round(w*s);exp.height=Math.round(h*s);
+  const ctx=exp.getContext('2d');
+  if(a)ctx.drawImage(a.canvas,0,0);
+  if(b){ctx.globalAlpha=parseFloat($('opS').value)/100;const o=off(cur);ctx.drawImage(b.canvas,Math.round(o.x*s),Math.round(o.y*s));ctx.globalAlpha=1;}
+  const dc=$('drC');if(dc)ctx.drawImage(dc,0,0,dc.width,dc.height,0,0,exp.width,exp.height);
+  const blob=await new Promise(r=>exp.toBlob(r,'image/png'));
+  const u=URL.createObjectURL(blob),a2=document.createElement('a');a2.href=u;a2.download=`compare_p${cur}.png`;a2.click();URL.revokeObjectURL(u);
+});
+
+// ═══ HOW-TO MODAL ═══
+const htModal=$('howto');
+$('htX').addEventListener('click',()=>htModal.classList.add('hide'));
+$('htGo').addEventListener('click',()=>htModal.classList.add('hide'));
+htModal.addEventListener('click',e=>{if(e.target===htModal)htModal.classList.add('hide');});
+$('helpB').addEventListener('click',()=>htModal.classList.remove('hide'));
+
+// ═══ DIFF OVERLAY ═══
+let diffOn=false;
+$('diffB').addEventListener('click',()=>{
+  if(!cA||!cB){return;}
+  diffOn=!diffOn;
+  $('diffB').classList.toggle('on',diffOn);
+  if(diffOn)buildDiffOverlay();
+  else removeDiffOverlay();
+});
+
+function buildDiffOverlay(){
+  removeDiffOverlay();
+  if(!cA||!cB)return;
+  const o=off(cur);
+  const s=renderScale;
+  const ox=Math.round(o.x*s),oy=Math.round(o.y*s);
+  const w=Math.max(cA.canvas.width,cB.canvas.width+Math.abs(ox));
+  const h=Math.max(cA.canvas.height,cB.canvas.height+Math.abs(oy));
+  const cw=Math.round(w/s),ch=Math.round(h/s);
+
+  // Composite both at render scale
+  const tA=document.createElement('canvas');tA.width=w;tA.height=h;
+  tA.getContext('2d').drawImage(cA.canvas,Math.max(0,-ox),Math.max(0,-oy));
+  const tB=document.createElement('canvas');tB.width=w;tB.height=h;
+  tB.getContext('2d').drawImage(cB.canvas,Math.max(0,ox),Math.max(0,oy));
+  const dA=tA.getContext('2d').getImageData(0,0,w,h).data;
+  const dB=tB.getContext('2d').getImageData(0,0,w,h).data;
+
+  // Build diff — only show CHANGED pixels as red, transparent elsewhere
+  const dc=document.createElement('canvas');dc.width=w;dc.height=h;dc.style.width=cw+'px';dc.style.height=ch+'px';
+  const ctx=dc.getContext('2d');const dd=ctx.createImageData(w,h);const pD=dd.data;
+  const thr=15;
+  for(let i=0;i<dA.length;i+=4){
+    const d=(Math.abs(dA[i]-dB[i])+Math.abs(dA[i+1]-dB[i+1])+Math.abs(dA[i+2]-dB[i+2]))/3;
+    if(d>thr){
+      pD[i]=255;pD[i+1]=30;pD[i+2]=60;pD[i+3]=Math.min(220,Math.max(100,d*2.5));
+    }
+    // else: leave transparent (0,0,0,0)
+  }
+  ctx.putImageData(dd,0,0);
+
+  const wrap=document.createElement('div');
+  wrap.className='diff-ovl';wrap.id='diffOvl';
+  wrap.style.left=Math.max(0,-o.x)+'px';wrap.style.top=Math.max(0,-o.y)+'px';
+  wrap.appendChild(dc);
+  W.appendChild(wrap);
+}
+
+function removeDiffOverlay(){
+  const el=$('diffOvl');if(el)el.remove();
+}
+
+// Re-apply diff overlay after scene rebuild if it was on
+const origBuildScene=buildScene;
+buildScene=function(){
+  origBuildScene();
+  if(diffOn&&cA&&cB)buildDiffOverlay();
+};
+</script>
 </body>
 </html>
